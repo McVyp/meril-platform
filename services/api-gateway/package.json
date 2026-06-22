@@ -1,0 +1,33 @@
+{
+  "name": "@meril/api-gateway",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "npx tsx watch src/index.ts",
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@meril/shared": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "ioredis": "^5.11.1",
+    "pg": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.3",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
