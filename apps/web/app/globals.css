@@ -1,8 +1,17 @@
 @import "tailwindcss";
+@source "./**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../hooks/**/*.{js,ts,jsx,tsx,mdx}";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+@layer base {
+  html {
+    font-size: 62.5%;
+  }
 }
 
 @theme inline {
@@ -23,4 +32,65 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.container {
+  background: #121010;
+}
+
+.container::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: rgba(18, 16, 16, 0.1);
+  opacity: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.container::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 5;
+  background-size: 100% 2px, 3px 100%;
+}
+
+.titleBar {
+  width: 100%;
+  display: flex;
+  gap: 1rem;
+}
+
+.videoTitle {
+  font-size: 2.4rem;
+  margin-left: 1rem;
+}
+
+.watch-progress {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  caret-color: transparent !important;
+}
+
+.watch-progress::-webkit-slider-runnable-track {
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  height: 1px !important;
+}
+
+.watch-progress::-moz-range-track {
+  background: transparent !important;
+  border: none !important;
+  height: 1px !important;
 }
