@@ -4,8 +4,8 @@
 @source "../hooks/**/*.{js,ts,jsx,tsx,mdx}";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @layer base {

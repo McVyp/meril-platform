@@ -5,7 +5,7 @@ import Title from "@/components/title";
 import Video from "@/components/video";
 import { videoData } from "@/data/videos";
 import { VideoData } from "@/types/video";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, TriangleAlert } from "lucide-react";
 import { useVideoCache } from "@/hooks/useVideoCache";
 import "./globals.css";
 
@@ -94,6 +94,9 @@ export default function Home() {
     <div
       className="h-screen w-full relative bg-black overflow-hidden"
       ref={wheelRef}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ touchAction: "none" }}
     >
       {currentItem.videoUrl && !currentFailed ? (
         <Video
@@ -106,7 +109,7 @@ export default function Home() {
         <div className="h-full w-full bg-gradient-to-br from-gray-900 via-gray-900 to-black flex items-center justify-center">
           <div className="text-center text-white">
             <div className="text-6xl mb-6 flex justify-center">
-              {currentFailed ? "⚠️" : <Clapperboard />}
+              {currentFailed ? <TriangleAlert /> : <Clapperboard />}
             </div>
             <h2 className="text-3xl font-bold mb-4">{currentItem.title}</h2>
             <p className="text-gray-300 max-w-md">
@@ -133,9 +136,6 @@ export default function Home() {
       <div
         className="absolute bottom-1/2 right-1/6 z-20 p-8 cursor-pointer"
         onClick={handleTitleClick}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={{ touchAction: "none" }}
       >
         <Title
           currentIndex={currentIndex}
