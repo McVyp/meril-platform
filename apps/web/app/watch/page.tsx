@@ -6,7 +6,7 @@ import VideoPlayer from "@/components/video-player";
 export default function WatchPage() {
   const router = useRouter();
   const [title, setTitle] = useState("Untitled");
-  const [playbackUrl, setPlaybackUrl] = useState("");
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const [description, setDescription] = useState("");
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function WatchPage() {
           </p>
         </div>
         <div className="flex-1 min-h-0 pb-4">
-          <VideoPlayer src={playbackUrl} title={title} />
+          {playbackUrl && <VideoPlayer src={playbackUrl} title={title} />}
         </div>
       </div>
     </div>

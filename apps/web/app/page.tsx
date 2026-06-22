@@ -138,11 +138,7 @@ export default function Home() {
         style={{ touchAction: "none" }}
       >
         <Title
-          title={currentItem.title}
-          description={currentItem.description}
           currentIndex={currentIndex}
-          totalItems={items.length}
-          isTransitioning={isTransitioning}
           allTitles={items.map((i) => i.title)}
         />
       </div>
