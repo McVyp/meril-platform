@@ -4,15 +4,15 @@ import { useRouter } from "next/navigation";
 import Title from "@/components/title";
 import Video from "@/components/video";
 import { videoData } from "@/data/videos";
-import { VideoData } from "@/types/video";
+import { ApiVideo, VideoData } from "@/types/video";
 import { Clapperboard, TriangleAlert } from "lucide-react";
 import { useVideoCache } from "@/hooks/useVideoCache";
 import "./globals.css";
 
 export default function Home() {
   const router = useRouter();
-  const [items] = useState<VideoData[]>(videoData);
-  const [currentIndex, setCurrentIndex] = useState(1);
+  const [items, setItems] = useState<VideoData[]>(videoData);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
 
@@ -42,6 +42,28 @@ export default function Home() {
     },
     [isTransitioning, items.length],
   );
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`)
+      .then((r) => r.json())
+      .then((videos: ApiVideo[]) => {
+        const dbVideos: VideoData[] = videos
+          .filter((v): v is ApiVideo & { playbackUrl: string } =>
+            Boolean(v.playbackUrl),
+          )
+          .map((v) => ({
+            id: v.id,
+            title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
+            description: v.description ?? "",
+            videoUrl: v.playbackUrl,
+            type: "video" as const,
+          }));
+        if (dbVideos.length > 0) {
+          setItems([...dbVideos, ...videoData]);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const el = wheelRef.current;
@@ -134,7 +156,7 @@ export default function Home() {
       )}
 
       <div
-        className="absolute bottom-1/2 right-1/6 z-20 p-8 cursor-pointer"
+        className="absolute top-1/10 bottom-1/2 right-1/6 z-20 p-8 cursor-pointer"
         onClick={handleTitleClick}
       >
         <Title

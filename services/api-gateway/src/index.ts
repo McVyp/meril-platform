@@ -4,12 +4,14 @@ import cors from "cors";
 import helmet from "helmet";
 import { db } from "./lib/db";
 import { redis } from "./lib/redis";
+import { videoRouter } from "./routes/video";
 
 const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
+app.use("/api/videos", videoRouter);
 
 app.get("/health", async (_req, res) => {
   try {

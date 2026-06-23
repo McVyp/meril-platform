@@ -1,14 +1,13 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Upload, X, Film } from "lucide-react";
+import { toast } from "sonner";
 
 export default function UploadPage() {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -60,13 +59,79 @@ export default function UploadPage() {
     if (!file || !title) return;
     setIsUploading(true);
     setUploadProgress(0);
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise((r) => setTimeout(r, 200));
-      setUploadProgress(i);
-    }
 
-    setIsUploading(false);
-    router.push("/");
+    try {
+      const { presignedUrl, s3Key } = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/videos/upload-url`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+          }),
+        },
+      ).then((r) => r.json());
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        // simulate progress up to 90% until real events fire
+        let simProgress = 0;
+        const sim = setInterval(() => {
+          simProgress += 2;
+          if (simProgress < 90) {
+            setUploadProgress(simProgress);
+          } else {
+            setUploadProgress(90);
+            clearInterval(sim);
+          }
+        }, 100);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            clearInterval(sim);
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          clearInterval(sim);
+          setUploadProgress(100);
+          xhr.status === 200
+            ? resolve()
+            : reject(new Error(`S3 upload failed: ${xhr.status}`));
+        };
+        xhr.onerror = () => {
+          clearInterval(sim);
+          reject(new Error("S3 upload failed"));
+        };
+        xhr.open("PUT", presignedUrl);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.send(file);
+      });
+
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          s3Key,
+        }),
+      });
+      await new Promise((r) => setTimeout(r, 1500));
+      setFile(null);
+      setPreviewUrl(null);
+      setTitle("");
+      setDescription("");
+      setUploadProgress(0);
+      toast.success("Upload complete");
+    } catch (err) {
+      toast.error("Upload failed — please try again");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -117,7 +182,7 @@ export default function UploadPage() {
                 isDragging
                   ? "border-white/50 bg-white/10"
                   : "border-white/10 hover:border-white/30 hover:bg-white/5"
-              }`}
+              } ${isUploading ? "pointer-events-none opacity-50" : ""}`}
             >
               <input
                 ref={fileInputRef}
