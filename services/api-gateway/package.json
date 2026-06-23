@@ -1,7 +1,6 @@
 {
   "name": "@meril/api-gateway",
   "version": "0.0.1",
-  "type": "module",
   "private": true,
   "scripts": {
     "dev": "npx tsx watch src/index.ts",
