@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "npx tsx watch src/index.ts",
     "build": "tsc",
+    "start": "prisma migrate deploy && node dist/index.js",
     "type-check": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
