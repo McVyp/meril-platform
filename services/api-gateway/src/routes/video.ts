@@ -7,10 +7,15 @@ import {
 import { z } from "zod";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { db } from "../lib/db";
+import { getTemporalClient } from "../lib/temporal";
 
 export const videoRouter = Router();
 
-const s3 = new S3Client({ region: process.env.AWS_REGION });
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
+});
 const BUCKET = process.env.S3_RAW_BUCKET!;
 
 // GET /api/videos
@@ -63,10 +68,22 @@ videoRouter.post("/", async (req, res) => {
         title,
         description,
         s3RawKey: s3Key,
-        status: "UPLOADING",
+        status: "PROCESSING",
         userId: null,
       },
     });
+
+    // trigger Temporal transcoding workflow
+    try {
+      const temporal = await getTemporalClient();
+      await temporal.workflow.start("TranscodeWorkflow", {
+        args: [s3Key],
+        taskQueue: "media-processor",
+        workflowId: `transcode-${video.id}`,
+      });
+    } catch (temporalErr) {
+      console.error("Failed to start transcode workflow:", temporalErr);
+    }
 
     res.status(201).json(video);
   } catch (err) {
@@ -89,21 +106,83 @@ videoRouter.post("/upload-url", async (req, res) => {
       return;
     }
 
-    const { fileName, contentType, fileSize } = parsed.data;
+    const { fileName, contentType } = parsed.data;
     const videoId = crypto.randomUUID();
     const s3Key = `raw/${videoId}/${fileName}`;
+    // ContentLength omitted intentionally — including it triggers CRC32 checksum
+    // requirement from AWS SDK v3 which browser XHR cannot satisfy.
     const presignedUrl = await getSignedUrl(
       s3,
       new PutObjectCommand({
         Bucket: BUCKET,
         Key: s3Key,
         ContentType: contentType,
-        ContentLength: fileSize,
       }),
       { expiresIn: 3600 },
     );
     res.json({ videoId, presignedUrl, s3Key });
   } catch (err) {
     res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+// GET /api/videos/:id/status
+videoRouter.get("/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const video = await db.video.findUnique({ where: { id } });
+    if (!video) {
+      res.status(404).json({ error: "Video not found" });
+      return;
+    }
+
+    // Already settled — return immediately without hitting Temporal
+    if (video.status === "READY" || video.status === "FAILED") {
+      res.json({ status: video.status, hlsUrl: video.hlsUrl });
+      return;
+    }
+
+    // Check live Temporal workflow status
+    const temporal = await getTemporalClient();
+    const handle = temporal.workflow.getHandle(`transcode-${id}`);
+
+    let desc;
+    try {
+      desc = await handle.describe();
+    } catch (err: any) {
+      // Workflow not found — return whatever DB has
+      if (err.name === "WorkflowNotFoundError") {
+        res.json({ status: video.status, hlsUrl: video.hlsUrl });
+        return;
+      }
+      throw err;
+    }
+
+    const wfStatus = desc.status.name;
+
+    if (wfStatus === "COMPLETED") {
+      const hlsKey = await handle.result(); // "hls/{id}/master.m3u8"
+      const hlsUrl = `https://${process.env.CLOUDFRONT_DOMAIN}/${hlsKey}`;
+      await db.video.update({
+        where: { id },
+        data: { status: "READY", hlsUrl },
+      });
+      res.json({ status: "READY", hlsUrl });
+      return;
+    }
+
+    if (
+      wfStatus === "FAILED" ||
+      wfStatus === "TIMED_OUT" ||
+      wfStatus === "CANCELLED"
+    ) {
+      await db.video.update({ where: { id }, data: { status: "FAILED" } });
+      res.json({ status: "FAILED", hlsUrl: null });
+      return;
+    }
+    res.json({ status: "PROCESSING", hlsUrl: null });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get video status" });
   }
 });

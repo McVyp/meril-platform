@@ -2,3 +2,4 @@ allowBuilds:
   '@prisma/engines': true
   esbuild: true
   prisma: true
+  protobufjs: set this to true or false
