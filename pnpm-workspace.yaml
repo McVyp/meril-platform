@@ -9,6 +9,7 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+  protobufjs: true
 
 onlyBuiltDependencies:
   - sharp
@@ -16,6 +17,6 @@ onlyBuiltDependencies:
   - "@prisma/engines"
   - esbuild
   - prisma
-
+  - protobufjs
 verifyDepsBeforeRun: false
 

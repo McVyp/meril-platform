@@ -9,10 +9,5 @@
   "devDependencies": {
     "turbo": "latest"
   },
-  "packageManager": "pnpm@11.5.2",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "protobufjs"
-    ]
-  }
+  "packageManager": "pnpm@11.5.2"
 }
