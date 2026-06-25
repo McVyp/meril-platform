@@ -56,6 +56,7 @@ export default function Home() {
             title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
             description: v.description ?? "",
             videoUrl: v.playbackUrl,
+            hlsUrl: v.hlsUrl ?? null,
             type: "video" as const,
           }));
         if (dbVideos.length > 0) {
@@ -102,7 +103,7 @@ export default function Home() {
       "watchItem",
       JSON.stringify({
         title: item.title,
-        playbackUrl: item.videoUrl,
+        playbackUrl: item.hlsUrl ?? item.videoUrl,
         description: item.description,
       }),
     );

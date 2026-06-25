@@ -3,6 +3,7 @@ export interface VideoData {
   title: string;
   description: string;
   videoUrl: string;
+  hlsUrl: string | null;
   type: "video";
 }
 
@@ -11,4 +12,5 @@ export interface ApiVideo {
   title: string;
   description: string | null;
   playbackUrl: string | null;
+  hlsUrl: string | null;
 }

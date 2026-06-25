@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, useEffect, useCallback } from "react";
+import Hls from "hls.js";
 
 interface VideoPlayerProps {
   src: string;
@@ -10,11 +11,37 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
+
+  // HLS setup
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !src) return;
+
+    if (src.includes(".m3u8")) {
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        return () => {
+          hls.destroy();
+          hlsRef.current = null;
+        };
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        // safari native HLS
+        video.src = src;
+      }
+    } else {
+      // plain MP4
+      video.src = src;
+    }
+  }, [src]);
 
   const togglePlay = () => {
     const v = videoRef.current;
@@ -70,7 +97,6 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
     >
       <video
         ref={videoRef}
-        src={src}
         className="w-full h-full object-cover"
         onTimeUpdate={handleTimeUpdate}
         onPlay={() => setIsPlaying(true)}
@@ -103,7 +129,9 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
           >
             ←
           </button>
-          <span className="text-white/80 text-[2rem] tracking-wide">{title}</span>
+          <span className="text-white/80 text-[2rem] tracking-wide">
+            {title}
+          </span>
         </div>
       )}
 
