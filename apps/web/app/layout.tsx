@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { GeistPixelSquare } from "geist/font/pixel";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { StreamProvider } from "@/context/StreamContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +38,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${GeistPixelSquare.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
+        <StreamProvider>{children}</StreamProvider>
         <Toaster />
       </body>
     </html>
