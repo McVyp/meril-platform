@@ -11,6 +11,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@aws-sdk/client-ivs": "^3.1075.0",
     "@aws-sdk/client-s3": "^3.1073.0",
     "@aws-sdk/s3-request-presigner": "^3.1073.0",
     "@prisma/adapter-pg": "^7.8.0",
@@ -22,6 +23,7 @@
     "helmet": "^8.2.0",
     "ioredis": "^5.11.1",
     "pg": "^8.21.0",
+    "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -29,6 +31,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
     "prisma": "^7.8.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"

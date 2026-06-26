@@ -1,10 +1,13 @@
 import "./lib/env";
+import http from "http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { db } from "./lib/db";
 import { redis } from "./lib/redis";
 import { videoRouter } from "./routes/video";
+import { streamRouter } from "./routes/stream";
+import { setupWebSocket } from "./lib/ws";
 
 const app = express();
 
@@ -12,6 +15,7 @@ app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
 app.use("/api/videos", videoRouter);
+app.use("/api/streams", streamRouter);
 
 app.get("/health", async (_req, res) => {
   try {
@@ -24,4 +28,6 @@ app.get("/health", async (_req, res) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`api-gateway running on :${PORT}`));
+const server = http.createServer(app);
+setupWebSocket(server);
+server.listen(PORT, () => console.log(`api-gateway running on :${PORT}`));
