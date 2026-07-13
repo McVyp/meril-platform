@@ -15,6 +15,11 @@ model User {
   role      Role     @default(VIEWER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  ivsChannelArn     String?
+  ivsIngestEndpoint String?
+  ivsPlaybackUrl    String?
+  ivsStreamKey      String?
+  ivsChatRoomArn    String?
 
   videos  Video[]
   streams Stream[]
@@ -41,9 +46,8 @@ model Stream {
   id          String       @id @default(cuid())
   userId      String
   title       String
+  description String?
   status      StreamStatus @default(OFFLINE)
-  channelArn  String?
-  playbackUrl String?
   viewerCount Int          @default(0)
   startedAt   DateTime?
   endedAt     DateTime?

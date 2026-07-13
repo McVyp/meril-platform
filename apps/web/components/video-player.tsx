@@ -1,22 +1,76 @@
 "use client";
 import { useRef, useState, useEffect, useCallback } from "react";
 import Hls from "hls.js";
+import { Badge } from "./ui/badge";
 
 interface VideoPlayerProps {
   src: string;
   title: string;
+  isLive?: boolean;
+  showLiveBadge?: boolean;
 }
 
-export default function VideoPlayer({ src, title }: VideoPlayerProps) {
+function SpeakerOnIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor" />
+      <path
+        d="M16.5 8.5a5 5 0 0 1 0 7M19 6a9 9 0 0 1 0 12"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+function SpeakerMutedIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor" />
+      <path
+        d="M16 9l5 6M21 9l-5 6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export default function VideoPlayer({
+  src,
+  title,
+  isLive = false,
+  showLiveBadge = true,
+}: VideoPlayerProps) {
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimeout = useRef<NodeJS.Timeout | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [qualities, setQualities] = useState<
+    { label: string; level: number }[]
+  >([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1);
 
   // HLS setup
   useEffect(() => {
@@ -25,25 +79,76 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
 
     if (src.includes(".m3u8")) {
       if (Hls.isSupported()) {
-        const hls = new Hls();
+        const hls = new Hls({
+          lowLatencyMode: isLive,
+          liveSyncDurationCount: 3,
+          liveMaxLatencyDurationCount: 6,
+          backBufferLength: isLive ? 30 : Infinity,
+          maxLiveSyncPlaybackRate: 1.5,
+        });
         hlsRef.current = hls;
         hls.loadSource(src);
         hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          const levels = hls.levels.map((l, i) => ({
+            label: l.height ? `${l.height}p` : `Level ${i}`,
+            level: i,
+          }));
+          const orderedLevels = [...levels].reverse();
+          setQualities([{ label: "Auto", level: -1 }, ...orderedLevels]);
+
+          const preferred = orderedLevels.find((l) => l.label === "720p");
+          if (preferred) {
+            hls.currentLevel = preferred.level;
+            setCurrentQuality(preferred.level);
+          } else {
+            setCurrentQuality(-1);
+          }
+
+          if (isLive) {
+            video.play().catch(() => {});
+            setHasStarted(true);
+          }
+        });
+
         return () => {
           hls.destroy();
           hlsRef.current = null;
         };
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        // safari native HLS
         video.src = src;
       }
     } else {
-      // plain MP4
       video.src = src;
+      return () => {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
     }
-  }, [src]);
+  }, [src, isLive]);
 
-  const togglePlay = () => {
+  useEffect(() => {
+    if (!isLive) return;
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const hls = hlsRef.current;
+      const video = videoRef.current;
+      if (!hls || !video) return;
+      const liveEdge = hls.liveSyncPosition;
+      if (liveEdge == null) return;
+      const drift = liveEdge - video.currentTime;
+      if (drift > 5) {
+        video.currentTime = liveEdge;
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, [isLive]);
+
+  const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
@@ -54,12 +159,15 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
       v.pause();
       setIsPlaying(false);
     }
-  };
+  }, []);
 
   const handleTimeUpdate = () => {
     const v = videoRef.current;
-    if (!v) return;
-    setProgress((v.currentTime / v.duration) * 100);
+    if (!v || isLive) return;
+    const pct = (v.currentTime / v.duration) * 100;
+    if (progressBarRef.current) {
+      progressBarRef.current.style.width = `${pct}%`;
+    }
   };
 
   const handleFullscreen = () => {
@@ -68,6 +176,24 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
     } else {
       document.exitFullscreen();
     }
+  };
+
+  const toggleMute = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const newMuted = !muted;
+    setMuted(newMuted);
+    v.muted = newMuted;
+  }, [muted]);
+
+  const cycleQuality = () => {
+    const hls = hlsRef.current;
+    if (!hls || qualities.length === 0) return;
+    const currentIndex = qualities.findIndex((q) => q.level === currentQuality);
+    const nextIndex = (currentIndex + 1) % qualities.length;
+    const next = qualities[nextIndex];
+    hls.currentLevel = next.level;
+    setCurrentQuality(next.level);
   };
 
   useEffect(() => {
@@ -92,7 +218,7 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
   return (
     <div
       ref={containerRef}
-      className="relative bg-black w-full aspect-video max-h-[calc(100vh-120px)] overflow-hidden"
+      className="relative bg-black w-full h-full overflow-hidden"
       onMouseMove={handleMouseMove}
     >
       <video
@@ -102,7 +228,18 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onClick={togglePlay}
+        muted={muted}
       />
+
+      {/* LIVE badge — top overlay, always visible while live and started */}
+      {isLive && hasStarted && showLiveBadge && (
+        <Badge
+          variant="destructive"
+          className="absolute top-4 left-4 z-10 bg-red-600 text-white border-0"
+        >
+          LIVE
+        </Badge>
+      )}
 
       {!hasStarted && (
         <div
@@ -138,37 +275,63 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
       {hasStarted && (
         <div
           className={`absolute bottom-0 left-0 right-0 px-5 py-4 transition-opacity duration-500
-      ${showControls ? "opacity-100" : "opacity-0 pointer-events-none"}
-      ${isFullscreen ? "bg-gradient-to-t from-black/50 to-transparent" : ""}`}
+            ${showControls ? "opacity-100" : "opacity-0 pointer-events-none"}
+            ${isFullscreen ? "bg-gradient-to-t from-black/50 to-transparent" : ""}`}
         >
           <div className="flex items-center gap-4">
             <button
               onClick={togglePlay}
-              className="text-white text-[1.5rem] font-bold shrink-0"
+              className="text-white/50 text-[1.5rem] font-bold shrink-0 cursor-pointer hover:text-white transition-colors"
             >
               {isPlaying ? "Pause" : "Play"}
             </button>
 
-            <div
-              className="flex-1 h-px bg-[#ffffff80] cursor-pointer relative"
-              onClick={(e) => {
-                const v = videoRef.current;
-                if (!v) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                const pct = (e.clientX - rect.left) / rect.width;
-                v.currentTime = pct * v.duration;
-                setProgress(pct * 100);
-              }}
-            >
+            {isLive ? (
+              <div className="flex-1" />
+            ) : (
               <div
-                className="absolute top-0 left-0 h-full bg-white"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+                className="flex-1 h-px bg-[#ffffff80] cursor-pointer relative"
+                onClick={(e) => {
+                  const v = videoRef.current;
+                  if (!v) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pct = (e.clientX - rect.left) / rect.width;
+                  v.currentTime = pct * v.duration;
+                  if (progressBarRef.current)
+                    progressBarRef.current.style.width = `${pct * 100}%`;
+                }}
+              >
+                <div
+                  className="absolute top-0 left-0 h-full bg-white"
+                  ref={progressBarRef}
+                  style={{ width: "0%" }}
+                />
+              </div>
+            )}
+
+            {isLive && (
+              <button
+                onClick={toggleMute}
+                className="text-white/50 text-[1.5rem] font-bold shrink-0 cursor-pointer hover:text-white transition-colors"
+                title={muted ? "Unmute" : "Mute"}
+              >
+                {muted ? <SpeakerMutedIcon /> : <SpeakerOnIcon />}
+              </button>
+            )}
+            {isLive && qualities.length > 1 && (
+              <button
+                onClick={cycleQuality}
+                className="text-white text-[1.5rem] font-bold shrink-0 cursor-pointer hover:text-white/80 transition-colors"
+                title="Click to change quality"
+              >
+                {qualities.find((q) => q.level === currentQuality)?.label ??
+                  "Auto"}
+              </button>
+            )}
 
             <button
               onClick={handleFullscreen}
-              className="text-white text-[1.5rem] font-bold shrink-0"
+              className={`text-white/50 text-[1.5rem] font-bold shrink-0 cursor-pointer hover:text-white transition-colors ${isFullscreen ? "px-10 py-4" : ""}`}
             >
               {isFullscreen ? "Exit" : "Fullscreen"}
             </button>

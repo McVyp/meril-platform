@@ -38,3 +38,5 @@ venv/
 
 # Docker
 *.env.docker
+
+start.sh

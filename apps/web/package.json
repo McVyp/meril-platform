@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "amazon-ivs-chat-messaging": "^1.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "geist": "^1.7.2",
@@ -19,6 +20,7 @@
     "radix-ui": "^1.6.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-resizable-panels": "^4.12.1",
     "shadcn": "^4.11.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",

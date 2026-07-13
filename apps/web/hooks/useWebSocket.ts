@@ -7,6 +7,8 @@ export function useWebSocket(
   onMessage: MessageHandler,
 ) {
   const wsRef = useRef<WebSocket | null>(null);
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
 
   const send = useCallback((payload: object) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -24,9 +26,8 @@ export function useWebSocket(
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        onMessage(data);
-      } catch {
-      }
+        onMessageRef.current(data);
+      } catch {}
     };
 
     ws.onerror = (err) => console.error("WebSocket error:", err);

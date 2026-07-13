@@ -2,7 +2,6 @@ import { WebSocketServer, WebSocket } from "ws";
 import { IncomingMessage } from "http";
 import { Server } from "http";
 
-// streamId → set of connected clients
 const rooms = new Map<string, Set<WebSocket>>();
 
 export function setupWebSocket(server: Server) {

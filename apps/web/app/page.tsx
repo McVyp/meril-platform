@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Title from "@/components/title";
 import Video from "@/components/video";
@@ -15,17 +15,26 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
+  const currentIdRef = useRef<string | number | null>(videoData[0]?.id ?? null);
 
   const wheelRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
   const lastTouchTime = useRef(0);
   const touchMoved = useRef(false);
 
-  const urlsToCache = [
-    items[currentIndex]?.videoUrl,
-    items[(currentIndex + 1) % items.length]?.videoUrl,
-    items[(currentIndex - 1 + items.length) % items.length]?.videoUrl,
-  ].filter(Boolean) as string[];
+  const nextItem = items[(currentIndex + 1) % items.length];
+  const prevItem = items[(currentIndex - 1 + items.length) % items.length];
+
+  const currentItem = items[currentIndex];
+  const currentFailed = failedVideos.has(currentIndex);
+
+  const urlsToCache = useMemo(
+    () =>
+      [currentItem?.videoUrl, nextItem?.videoUrl, prevItem?.videoUrl].filter(
+        Boolean,
+      ) as string[],
+    [currentItem?.videoUrl, nextItem?.videoUrl, prevItem?.videoUrl],
+  );
 
   useVideoCache(urlsToCache);
 
@@ -33,11 +42,14 @@ export default function Home() {
     (direction: "next" | "prev") => {
       if (isTransitioning || items.length === 0) return;
       setIsTransitioning(true);
-      setCurrentIndex((prev) =>
-        direction === "next"
-          ? (prev + 1) % items.length
-          : (prev - 1 + items.length) % items.length,
-      );
+      setCurrentIndex((prev) => {
+        const next =
+          direction === "next"
+            ? (prev + 1) % items.length
+            : (prev - 1 + items.length) % items.length;
+        currentIdRef.current = items[next]?.id ?? null;
+        return next;
+      });
       setTimeout(() => setIsTransitioning(false), 800);
     },
     [isTransitioning, items.length],
@@ -60,10 +72,58 @@ export default function Home() {
             type: "video" as const,
           }));
         if (dbVideos.length > 0) {
-          setItems([...dbVideos, ...videoData]);
+          setItems((prev) => {
+            const live = prev.filter((i) => i.type === "live");
+            const merged = [...live, ...dbVideos, ...videoData];
+            const idx = merged.findIndex((i) => i.id === currentIdRef.current);
+            if (idx !== -1) setCurrentIndex(idx);
+            return merged;
+          });
         }
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchStreams = () => {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/streams`)
+        .then((r) => r.json())
+        .then((streams: any[]) => {
+          const liveIds = new Set(
+            streams
+              .filter((s) => s.status === "LIVE" && s.playbackUrl)
+              .map((s) => s.id),
+          );
+          const liveStreams: VideoData[] = streams
+            .filter((s) => liveIds.has(s.id))
+            .map((s) => ({
+              id: s.id,
+              title: s.title,
+              description: s.description ?? "",
+              videoUrl: s.playbackUrl,
+              hlsUrl: s.playbackUrl,
+              type: "live" as const,
+            }));
+
+          setItems((prev) => {
+            const withoutStaleLive = prev.filter(
+              (i) => i.type !== "live" || liveIds.has(i.id),
+            );
+            const newLive = liveStreams.filter(
+              (s) => !withoutStaleLive.some((i) => i.id === s.id),
+            );
+            const merged = [...newLive, ...withoutStaleLive];
+            const idx = merged.findIndex((i) => i.id === currentIdRef.current);
+            if (idx !== -1) setCurrentIndex(idx);
+            return merged;
+          });
+        })
+        .catch(() => {});
+    };
+
+    fetchStreams();
+    const interval = setInterval(fetchStreams, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -92,13 +152,20 @@ export default function Home() {
     }
   };
 
-  const handleTitleClick = () => {
+  const handleTitleClick = (index: number) => {
     if (touchMoved.current) {
       touchMoved.current = false;
       return;
     }
-    const item = items[currentIndex];
+    const item = items[index];
     if (!item?.videoUrl) return;
+    currentIdRef.current = item.id;
+    setCurrentIndex(index);
+    if (item.type === "live") {
+      router.push(`/live/${item.id}`);
+      return;
+    }
+
     sessionStorage.setItem(
       "watchItem",
       JSON.stringify({
@@ -109,9 +176,6 @@ export default function Home() {
     );
     router.push("/watch");
   };
-
-  const currentItem = items[currentIndex];
-  const currentFailed = failedVideos.has(currentIndex);
 
   return (
     <div
@@ -124,9 +188,11 @@ export default function Home() {
       {currentItem.videoUrl && !currentFailed ? (
         <Video
           videoUrl={currentItem.videoUrl}
-          nextVideoUrl={items[(currentIndex + 1) % items.length]?.videoUrl}
+          nextVideoUrl={nextItem?.videoUrl}
           isTransitioning={isTransitioning}
           isLoaded={true}
+          isLive={currentItem.type === "live"}
+          isNextLive={nextItem?.type === "live"}
         />
       ) : (
         <div className="h-full w-full bg-gradient-to-br from-gray-900 via-gray-900 to-black flex items-center justify-center">
@@ -157,12 +223,14 @@ export default function Home() {
       )}
 
       <div
-        className="absolute top-1/10 bottom-1/2 right-1/6 z-20 p-8 cursor-pointer"
-        onClick={handleTitleClick}
+        className="absolute top-1/10 bottom-1/2 right-1/6 z-20 p-8 "
       >
         <Title
           currentIndex={currentIndex}
           allTitles={items.map((i) => i.title)}
+          itemIds={items.map((i) => i.id)}
+          liveFlags={items.map((i) => i.type === "live")}
+          onSelect={handleTitleClick}
         />
       </div>
 
