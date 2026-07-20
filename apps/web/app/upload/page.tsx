@@ -26,12 +26,23 @@ export default function UploadPage() {
   const handleFile = useCallback(
     (f: File) => {
       if (!f.type.startsWith("video/")) return;
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(f);
+      });
       setFile(f);
-      setPreviewUrl(URL.createObjectURL(f));
       if (!title) setTitle(f.name.replace(/\.[^/.]+$/, ""));
     },
     [title],
   );
+
+  const clearFile = () => {
+    setFile(null);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -50,29 +61,23 @@ export default function UploadPage() {
 
   const handleDragLeave = () => setIsDragging(false);
 
-  const clearFile = () => {
-    setFile(null);
-    setPreviewUrl(null);
-  };
-
   const handleSubmit = async () => {
     if (!file || !title) return;
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-      const { presignedUrl, s3Key } = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/videos/upload-url`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-          }),
-        },
-      ).then((r) => r.json());
+      const urlRes = await fetch("/api/videos/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          fileSize: file.size,
+        }),
+      });
+      if (!urlRes.ok) throw new Error("Could not start upload.");
+      const { videoId, presignedUrl, s3Key } = await urlRes.json();
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -98,9 +103,11 @@ export default function UploadPage() {
         xhr.onload = () => {
           clearInterval(sim);
           setUploadProgress(100);
-          xhr.status === 200
-            ? resolve()
-            : reject(new Error(`S3 upload failed: ${xhr.status}`));
+          if (xhr.status === 200) {
+            resolve();
+          } else {
+            reject(new Error(`S3 upload failed: ${xhr.status}`));
+          }
         };
         xhr.onerror = () => {
           clearInterval(sim);
@@ -111,24 +118,31 @@ export default function UploadPage() {
         xhr.send(file);
       });
 
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`, {
+      const createRes = await fetch("/api/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description,
-          s3Key,
-        }),
+        body: JSON.stringify({ videoId, title, description, s3Key }),
       });
+
+      if (!createRes.ok)
+        throw new Error("Upload succeeded but saving the video failed.");
+
       await new Promise((r) => setTimeout(r, 1500));
       setFile(null);
-      setPreviewUrl(null);
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       setTitle("");
       setDescription("");
       setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success("Upload complete");
     } catch (err) {
-      toast.error("Upload failed — please try again");
+      console.error("Upload failed:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Upload failed — please try again",
+      );
     } finally {
       setIsUploading(false);
     }

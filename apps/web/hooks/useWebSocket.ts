@@ -8,7 +8,10 @@ export function useWebSocket(
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   const send = useCallback((payload: object) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -27,7 +30,9 @@ export function useWebSocket(
       try {
         const data = JSON.parse(event.data);
         onMessageRef.current(data);
-      } catch {}
+      } catch (err) {
+        console.error("Failed to parse WebSocket message:", err);
+      }
     };
 
     ws.onerror = (err) => console.error("WebSocket error:", err);

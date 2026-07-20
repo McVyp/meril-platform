@@ -12,18 +12,9 @@ import {
 } from "@/components/ui/resizable";
 import { ChevronLeft } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { WsMessage, PublicStream as Stream } from "@/types/stream";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const CHAT_COLLAPSED_KEY = "live-chat-collapsed";
-
-interface Stream {
-  id: string;
-  title: string;
-  status: string;
-  playbackUrl: string | null;
-  viewerCount: number;
-  userId: string;
-}
 
 export default function LivePage() {
   const params = useParams();
@@ -31,33 +22,50 @@ export default function LivePage() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [stream, setStream] = useState<Stream | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
 
   const [chatCollapsed, setChatCollapsed] = useState(false);
   useEffect(() => {
-    setChatCollapsed(localStorage.getItem(CHAT_COLLAPSED_KEY) === "1");
+    try {
+      setChatCollapsed(localStorage.getItem(CHAT_COLLAPSED_KEY) === "1");
+    } catch (err) {
+      console.error("Failed to read chat-collapsed preference:", err);
+    }
   }, []);
+  
   const toggleChat = useCallback(() => {
     setChatCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem(CHAT_COLLAPSED_KEY, next ? "1" : "0");
+      try {
+        localStorage.setItem(CHAT_COLLAPSED_KEY, next ? "1" : "0");
+      } catch (err) {
+        console.error("Failed to save chat-collapsed preference:", err);
+      }
       return next;
     });
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/streams/${id}`)
-      .then((r) => r.json())
+    fetch(`/api/streams/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Stream fetch failed: ${r.status}`);
+        return r.json();
+      })
       .then((data: Stream) => {
         setStream(data);
         setViewerCount(data.viewerCount ?? 0);
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Failed to load stream:", err);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleWsMessage = useCallback((data: any) => {
-    if (data.type === "VIEWER_COUNT") setViewerCount(data.count);
+  const handleWsMessage = useCallback((data: unknown) => {
+    const msg = data as WsMessage;
+    if (msg.type === "VIEWER_COUNT") setViewerCount(msg.count ?? 0);
   }, []);
   useWebSocket(id, handleWsMessage);
 
@@ -72,7 +80,9 @@ export default function LivePage() {
   if (!stream) {
     return (
       <div className="h-dvh bg-black flex items-center justify-center text-white/40 text-[1.4rem]">
-        Stream not found.
+        {loadError
+          ? "Couldn't load this stream — try refreshing."
+          : "Stream not found."}
       </div>
     );
   }

@@ -8,6 +8,8 @@ import { ApiVideo, VideoData } from "@/types/video";
 import { Clapperboard, TriangleAlert } from "lucide-react";
 import { useVideoCache } from "@/hooks/useVideoCache";
 import "./globals.css";
+import UserMenu from "@/components/userMenu";
+import { PublicStream } from "@/types/stream";
 
 export default function Home() {
   const router = useRouter();
@@ -16,6 +18,10 @@ export default function Home() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
   const currentIdRef = useRef<string | number | null>(videoData[0]?.id ?? null);
+
+  const nextCursorRef = useRef<string | null>(null);
+  const isFetchingMoreRef = useRef(false);
+  const hasMoreRef = useRef(true);
 
   const wheelRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
@@ -38,6 +44,59 @@ export default function Home() {
 
   useVideoCache(urlsToCache);
 
+  const mapApiVideos = (videos: ApiVideo[]): VideoData[] =>
+    videos
+      .filter((v): v is ApiVideo & { playbackUrl: string } =>
+        Boolean(v.playbackUrl),
+      )
+      .map((v) => ({
+        id: v.id,
+        title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
+        description: v.description ?? "",
+        videoUrl: v.playbackUrl,
+        hlsUrl: v.hlsUrl ?? null,
+        type: "video" as const,
+      }));
+
+  const fetchMoreVideos = useCallback(() => {
+    if (isFetchingMoreRef.current || !hasMoreRef.current) return;
+    isFetchingMoreRef.current = true;
+
+    const url = nextCursorRef.current
+      ? `/api/videos?cursor=${encodeURIComponent(nextCursorRef.current)}`
+      : "/api/videos";
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((data: { videos: ApiVideo[]; nextCursor: string | null }) => {
+        nextCursorRef.current = data.nextCursor;
+        hasMoreRef.current = data.nextCursor !== null;
+
+        const dbVideos = mapApiVideos(data.videos);
+        if (dbVideos.length === 0) return;
+
+        setItems((prev) => {
+          const live = prev.filter((i) => i.type === "live");
+          const existingDb = prev.filter(
+            (i) => i.type === "video" && !videoData.some((v) => v.id === i.id),
+          );
+          const filler = prev.filter((i) =>
+            videoData.some((v) => v.id === i.id),
+          );
+          const merged = [...live, ...existingDb, ...dbVideos, ...filler];
+          const idx = merged.findIndex((i) => i.id === currentIdRef.current);
+          if (idx !== -1) setCurrentIndex(idx);
+          return merged;
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to fetch more videos:", err);
+      })
+      .finally(() => {
+        isFetchingMoreRef.current = false;
+      });
+  }, []);
+
   const navigateToIndex = useCallback(
     (direction: "next" | "prev") => {
       if (isTransitioning || items.length === 0) return;
@@ -48,77 +107,66 @@ export default function Home() {
             ? (prev + 1) % items.length
             : (prev - 1 + items.length) % items.length;
         currentIdRef.current = items[next]?.id ?? null;
+
+        // approaching the end of loaded items — fetch the next page.
+        if (direction === "next" && next >= items.length - 3) {
+          fetchMoreVideos();
+        }
         return next;
       });
       setTimeout(() => setIsTransitioning(false), 800);
     },
-    [isTransitioning, items.length],
+    [isTransitioning, items.length, fetchMoreVideos],
   );
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`)
-      .then((r) => r.json())
-      .then((videos: ApiVideo[]) => {
-        const dbVideos: VideoData[] = videos
-          .filter((v): v is ApiVideo & { playbackUrl: string } =>
-            Boolean(v.playbackUrl),
-          )
-          .map((v) => ({
-            id: v.id,
-            title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
-            description: v.description ?? "",
-            videoUrl: v.playbackUrl,
-            hlsUrl: v.hlsUrl ?? null,
-            type: "video" as const,
-          }));
-        if (dbVideos.length > 0) {
-          setItems((prev) => {
-            const live = prev.filter((i) => i.type === "live");
-            const merged = [...live, ...dbVideos, ...videoData];
-            const idx = merged.findIndex((i) => i.id === currentIdRef.current);
-            if (idx !== -1) setCurrentIndex(idx);
-            return merged;
-          });
-        }
-      })
-      .catch(() => {});
-  }, []);
+    fetchMoreVideos();
+  }, [fetchMoreVideos]);
 
   useEffect(() => {
     const fetchStreams = () => {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/streams`)
+      fetch(`/api/streams`)
         .then((r) => r.json())
-        .then((streams: any[]) => {
-          const liveIds = new Set(
-            streams
-              .filter((s) => s.status === "LIVE" && s.playbackUrl)
-              .map((s) => s.id),
-          );
-          const liveStreams: VideoData[] = streams
-            .filter((s) => liveIds.has(s.id))
-            .map((s) => ({
-              id: s.id,
-              title: s.title,
-              description: s.description ?? "",
-              videoUrl: s.playbackUrl,
-              hlsUrl: s.playbackUrl,
-              type: "live" as const,
-            }));
-
-          setItems((prev) => {
-            const withoutStaleLive = prev.filter(
-              (i) => i.type !== "live" || liveIds.has(i.id),
+        .then(
+          (data: { streams: PublicStream[]; nextCursor: string | null }) => {
+            const streams = data.streams;
+            const liveIds = new Set(
+              streams
+                .filter((s) => s.status === "LIVE" && s.playbackUrl)
+                .map((s) => s.id),
             );
-            const newLive = liveStreams.filter(
-              (s) => !withoutStaleLive.some((i) => i.id === s.id),
-            );
-            const merged = [...newLive, ...withoutStaleLive];
-            const idx = merged.findIndex((i) => i.id === currentIdRef.current);
-            if (idx !== -1) setCurrentIndex(idx);
-            return merged;
-          });
-        })
-        .catch(() => {});
+            const liveStreams: VideoData[] = streams
+              .filter(
+                (s): s is PublicStream & { playbackUrl: string } =>
+                  liveIds.has(s.id) && Boolean(s.playbackUrl),
+              )
+              .map((s) => ({
+                id: s.id,
+                title: s.title,
+                description: s.description ?? "",
+                videoUrl: s.playbackUrl,
+                hlsUrl: s.playbackUrl,
+                type: "live" as const,
+              }));
+            setItems((prev) => {
+              const withoutStaleLive = prev.filter(
+                (i) => i.type !== "live" || liveIds.has(i.id),
+              );
+              const newLive = liveStreams.filter(
+                (s) => !withoutStaleLive.some((i) => i.id === s.id),
+              );
+              const merged = [...newLive, ...withoutStaleLive];
+              const idx = merged.findIndex(
+                (i) => i.id === currentIdRef.current,
+              );
+              if (idx !== -1) setCurrentIndex(idx);
+              return merged;
+            });
+          },
+        )
+        .catch((err) => {
+          console.error("Failed to fetch streams:", err);
+        });
     };
 
     fetchStreams();
@@ -166,14 +214,18 @@ export default function Home() {
       return;
     }
 
-    sessionStorage.setItem(
-      "watchItem",
-      JSON.stringify({
-        title: item.title,
-        playbackUrl: item.hlsUrl ?? item.videoUrl,
-        description: item.description,
-      }),
-    );
+    try {
+      sessionStorage.setItem(
+        "watchItem",
+        JSON.stringify({
+          title: item.title,
+          playbackUrl: item.hlsUrl ?? item.videoUrl,
+          description: item.description,
+        }),
+      );
+    } catch (err) {
+      console.error("Failed to store watch item:", err);
+    }
     router.push("/watch");
   };
 
@@ -222,9 +274,10 @@ export default function Home() {
         </div>
       )}
 
-      <div
-        className="absolute top-1/10 bottom-1/2 right-1/6 z-20 p-8 "
-      >
+      <div className="absolute top-4 left-4 z-30">
+        <UserMenu />
+      </div>
+      <div className="absolute top-1/10 bottom-1/2 right-1/6 z-20 p-8 ">
         <Title
           currentIndex={currentIndex}
           allTitles={items.map((i) => i.title)}

@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { WsMessage } from "@/types/stream";
 
 interface StreamState {
   streamId: string | null;
@@ -33,7 +34,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   });
 
   const handleMessage = useCallback((data: unknown) => {
-    const msg = data as { type: string; count?: number; playbackUrl?: string };
+    const msg = data as WsMessage;
 
     if (msg.type === "VIEWER_COUNT") {
       setState((prev) => ({ ...prev, viewerCount: msg.count ?? 0 }));

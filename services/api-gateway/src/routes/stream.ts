@@ -15,9 +15,14 @@ import { ivschat } from "../lib/ivschat";
 import {
   CreateStreamBody,
   PatchStreamBody,
-  ChatTokenBody,
   EventBridgeIvsEvent,
 } from "../types/stream";
+import { optionalAuth, requireAuth } from "../middleware/auth";
+import { requireDbUser } from "../middleware/requireDbUser";
+import { z } from "zod";
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 50;
 
 export const streamRouter = Router();
 
@@ -25,25 +30,22 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Unknown error";
 }
 
-// Provisions an IVS channel ONCE per user (checked via ivsChannelArn) and
-// reuses it for every stream after — AWS only returns the stream key's plaintext value at creation time, so it must be persisted then.
+// IVS channel is provisioned once per user and reused for every stream after.
 streamRouter.post(
   "/",
+  requireAuth,
+  requireDbUser,
   async (req: Request<{}, {}, CreateStreamBody>, res: Response) => {
-    const { title, description, userId } = req.body;
+    const { title, description } = req.body;
+    const userId = req.dbUser!.id;
 
-    if (!title || !userId) {
-      res.status(400).json({ error: "title and userId are required" });
+    if (!title) {
+      res.status(400).json({ error: "title is required" });
       return;
     }
 
     try {
-      let user = await db.user.findUnique({ where: { id: userId } });
-
-      if (!user) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
+      let user = req.dbUser!;
 
       if (!user.ivsChannelArn) {
         const command = new CreateChannelCommand({
@@ -122,8 +124,119 @@ streamRouter.post(
   },
 );
 
-streamRouter.get("/", async (_req: Request, res: Response) => {
+async function reconcileActiveStreams(): Promise<
+  Map<string, { status: string; playbackUrl: string | null }>
+> {
+  const active = await db.stream.findMany({
+    where: { status: { in: ["OFFLINE", "LIVE"] } },
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: { select: { ivsPlaybackUrl: true, ivsChannelArn: true } },
+    },
+  });
+
+  const latestIdByChannel = new Map<string, string>();
+  for (const s of active) {
+    if (!s.user.ivsChannelArn) continue;
+    if (!latestIdByChannel.has(s.user.ivsChannelArn)) {
+      latestIdByChannel.set(s.user.ivsChannelArn, s.id);
+    }
+  }
+
+  const result = new Map<string, { status: string; playbackUrl: string | null }>();
+
+  await Promise.all(
+    active.map(async (s) => {
+      const playbackUrl = s.user.ivsPlaybackUrl;
+      const isLatestForChannel =
+        !!s.user.ivsChannelArn &&
+        latestIdByChannel.get(s.user.ivsChannelArn) === s.id;
+
+      if (s.status === "LIVE" && s.user.ivsChannelArn && !isLatestForChannel) {
+        await db.stream.update({
+          where: { id: s.id },
+          data: { status: "ENDED", endedAt: new Date() },
+        });
+        result.set(s.id, { status: "ENDED", playbackUrl });
+        return;
+      }
+
+      if (s.status === "LIVE" && s.user.ivsChannelArn) {
+        try {
+          const { stream: ivsStream } = await ivs.send(
+            new GetStreamCommand({ channelArn: s.user.ivsChannelArn }),
+          );
+          if (ivsStream?.state !== "LIVE") {
+            await db.stream.update({
+              where: { id: s.id },
+              data: { status: "ENDED", endedAt: new Date() },
+            });
+            result.set(s.id, { status: "ENDED", playbackUrl });
+            return;
+          }
+        } catch (e: any) {
+          if (
+            e.name === "ChannelNotBroadcasting" ||
+            e.Code === "ChannelNotBroadcasting"
+          ) {
+            await db.stream.update({
+              where: { id: s.id },
+              data: { status: "ENDED", endedAt: new Date() },
+            });
+            result.set(s.id, { status: "ENDED", playbackUrl });
+            return;
+          }
+          console.error("Reconcile check failed for stream", s.id, e);
+        }
+      } else if (
+        s.status === "OFFLINE" &&
+        s.user.ivsChannelArn &&
+        isLatestForChannel
+      ) {
+        try {
+          const { stream: ivsStream } = await ivs.send(
+            new GetStreamCommand({ channelArn: s.user.ivsChannelArn }),
+          );
+          if (ivsStream?.state === "LIVE") {
+            await db.stream.update({
+              where: { id: s.id },
+              data: { status: "LIVE", startedAt: new Date() },
+            });
+            result.set(s.id, { status: "LIVE", playbackUrl });
+            return;
+          }
+        } catch (e: any) {
+          if (
+            e.name !== "ChannelNotBroadcasting" &&
+            e.Code !== "ChannelNotBroadcasting"
+          ) {
+            console.error("Reconcile check failed for stream", s.id, e);
+          }
+        }
+      }
+
+      result.set(s.id, { status: s.status, playbackUrl });
+    }),
+  );
+
+  return result;
+}
+// public — anyone can browse live/recent streams without logging in.
+streamRouter.get("/", async (req: Request, res: Response) => {
   try {
+    const querySchema = z.object({
+      cursor: z.string().optional(),
+      limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
+    });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+    const { cursor, limit = DEFAULT_PAGE_SIZE } = parsed.data;
+
+    const reconciled = await reconcileActiveStreams();
+
     const streams = await db.stream.findMany({
       where: {
         OR: [
@@ -135,6 +248,8 @@ streamRouter.get("/", async (_req: Request, res: Response) => {
         ],
       },
       orderBy: { createdAt: "desc" },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       include: {
         user: {
           select: { ivsPlaybackUrl: true, ivsChannelArn: true, name: true },
@@ -142,167 +257,82 @@ streamRouter.get("/", async (_req: Request, res: Response) => {
       },
     });
 
-    // A user's IVS channel is shared across every Stream row they've ever created, and GetStreamCommand reports on the channel, not a row — so without deduping, every stale row on the same channel would each independently see "live" and all get marked LIVE at once.
-    const latestIdByChannel = new Map<string, string>();
-    for (const s of streams) {
-      if (!s.user.ivsChannelArn) continue;
-      if (s.status !== "OFFLINE" && s.status !== "LIVE") continue;
-      if (!latestIdByChannel.has(s.user.ivsChannelArn)) {
-        latestIdByChannel.set(s.user.ivsChannelArn, s.id);
-      }
-    }
+    const hasMore = streams.length > limit;
+    const page = hasMore ? streams.slice(0, limit) : streams;
 
-    const reconciled = await Promise.all(
-      streams.map(async (s) => {
-        const isLatestForChannel =
-          !!s.user.ivsChannelArn &&
-          latestIdByChannel.get(s.user.ivsChannelArn) === s.id;
+    const withStatus = page.map((s) => {
+      const r = reconciled.get(s.id);
+      return {
+        ...s,
+        status: r?.status ?? s.status,
+        playbackUrl: r?.playbackUrl ?? s.user.ivsPlaybackUrl,
+      };
+    });
 
-        if (
-          s.status === "LIVE" &&
-          s.user.ivsChannelArn &&
-          !isLatestForChannel
-        ) {
-          await db.stream.update({
-            where: { id: s.id },
-            data: { status: "ENDED", endedAt: new Date() },
-          });
-          return { ...s, status: "ENDED", playbackUrl: s.user.ivsPlaybackUrl };
-        }
-
-        if (s.status === "LIVE" && s.user.ivsChannelArn) {
-          try {
-            const { stream: ivsStream } = await ivs.send(
-              new GetStreamCommand({ channelArn: s.user.ivsChannelArn }),
-            );
-            if (ivsStream?.state !== "LIVE") {
-              await db.stream.update({
-                where: { id: s.id },
-                data: { status: "ENDED", endedAt: new Date() },
-              });
-              return {
-                ...s,
-                status: "ENDED",
-                playbackUrl: s.user.ivsPlaybackUrl,
-              };
-            }
-          } catch (e: any) {
-            if (
-              e.name === "ChannelNotBroadcasting" ||
-              e.Code === "ChannelNotBroadcasting"
-            ) {
-              await db.stream.update({
-                where: { id: s.id },
-                data: { status: "ENDED", endedAt: new Date() },
-              });
-              return {
-                ...s,
-                status: "ENDED",
-                playbackUrl: s.user.ivsPlaybackUrl,
-              };
-            }
-            console.error("Reconcile check failed for stream", s.id, e);
-          }
-        } else if (
-          s.status === "OFFLINE" &&
-          s.user.ivsChannelArn &&
-          isLatestForChannel
-        ) {
-          try {
-            const { stream: ivsStream } = await ivs.send(
-              new GetStreamCommand({ channelArn: s.user.ivsChannelArn }),
-            );
-            if (ivsStream?.state === "LIVE") {
-              await db.stream.update({
-                where: { id: s.id },
-                data: { status: "LIVE", startedAt: new Date() },
-              });
-              return {
-                ...s,
-                status: "LIVE",
-                playbackUrl: s.user.ivsPlaybackUrl,
-              };
-            }
-          } catch (e: any) {
-            if (
-              e.name !== "ChannelNotBroadcasting" &&
-              e.Code !== "ChannelNotBroadcasting"
-            ) {
-              console.error("Reconcile check failed for stream", s.id, e);
-            }
-          }
-        }
-        return { ...s, playbackUrl: s.user.ivsPlaybackUrl };
-      }),
-    );
-
-    res.json(reconciled);
+    res.json({
+      streams: withStatus,
+      nextCursor: hasMore ? page[page.length - 1].id : null,
+    });
   } catch (err) {
     console.error("GET /api/streams error:", err);
     res.status(500).json({ error: errorMessage(err) });
   }
 });
 
-// The studio page's own current stream — rehydrates state after a reload,
-// since studio's title/description/stream state is plain useState.
-// Includes ingestEndpoint/streamKey, unlike the other endpoints — safe
-// only because the caller always passes their own userId.
-streamRouter.get("/mine", async (req: Request, res: Response) => {
-  const userId = req.query.userId as string;
-  if (!userId) {
-    res.status(400).json({ error: "userId is required" });
-    return;
-  }
+// rehydrates the studio page's own stream state after a reload.
+streamRouter.get(
+  "/mine",
+  requireAuth,
+  requireDbUser,
+  async (req: Request, res: Response) => {
+    const userId = req.dbUser!.id;
+    const user = req.dbUser!;
 
-  try {
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
+    try {
+      const stream = await db.stream.findFirst({
+        where: { userId, status: { in: ["OFFLINE", "LIVE"] } },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (!stream) {
+        res.json({ stream: null });
+        return;
+      }
+
+      if (user.ivsChannelArn && stream.status !== "LIVE") {
+        try {
+          const { stream: ivsStream } = await ivs.send(
+            new GetStreamCommand({ channelArn: user.ivsChannelArn }),
+          );
+          if (ivsStream?.state === "LIVE") {
+            await db.stream.update({
+              where: { id: stream.id },
+              data: { status: "LIVE", startedAt: new Date() },
+            });
+            stream.status = "LIVE";
+          }
+        } catch {}
+      }
+
+      res.json({
+        stream: {
+          id: stream.id,
+          title: stream.title,
+          description: stream.description,
+          status: stream.status,
+          playbackUrl: user.ivsPlaybackUrl,
+          ingestEndpoint: user.ivsIngestEndpoint,
+          streamKey: user.ivsStreamKey,
+        },
+      });
+    } catch (err) {
+      console.error("GET /api/streams/mine error:", err);
+      res.status(500).json({ error: errorMessage(err) });
     }
+  },
+);
 
-    const stream = await db.stream.findFirst({
-      where: { userId, status: { in: ["OFFLINE", "LIVE"] } },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!stream) {
-      res.json({ stream: null });
-      return;
-    }
-
-    if (user.ivsChannelArn && stream.status !== "LIVE") {
-      try {
-        const { stream: ivsStream } = await ivs.send(
-          new GetStreamCommand({ channelArn: user.ivsChannelArn }),
-        );
-        if (ivsStream?.state === "LIVE") {
-          await db.stream.update({
-            where: { id: stream.id },
-            data: { status: "LIVE", startedAt: new Date() },
-          });
-          stream.status = "LIVE";
-        }
-      } catch {}
-    }
-
-    res.json({
-      stream: {
-        id: stream.id,
-        title: stream.title,
-        description: stream.description,
-        status: stream.status,
-        playbackUrl: user.ivsPlaybackUrl,
-        ingestEndpoint: user.ivsIngestEndpoint,
-        streamKey: user.ivsStreamKey,
-      },
-    });
-  } catch (err) {
-    console.error("GET /api/streams/mine error:", err);
-    res.status(500).json({ error: errorMessage(err) });
-  }
-});
-
+// public — anyone can watch/view a specific stream's details.
 streamRouter.get("/:id", async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
@@ -340,13 +370,26 @@ streamRouter.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
+// requires login and ownership.
 streamRouter.patch(
   "/:id",
+  requireAuth,
+  requireDbUser,
   async (req: Request<{ id: string }, {}, PatchStreamBody>, res: Response) => {
     const id = req.params.id as string;
     const { title, description } = req.body;
 
     try {
+      const existing = await db.stream.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ error: "Stream not found" });
+        return;
+      }
+      if (existing.userId !== req.dbUser!.id) {
+        res.status(403).json({ error: "You don't own this stream" });
+        return;
+      }
+
       const stream = await db.stream.update({
         where: { id },
         data: {
@@ -362,16 +405,12 @@ streamRouter.patch(
   },
 );
 
+// auth optional — logged-in users get SEND_MESSAGE, anonymous viewers get view-only.
 streamRouter.post(
   "/:id/chat-token",
-  async (req: Request<{ id: string }, {}, ChatTokenBody>, res: Response) => {
-    const id = req.params.id as string;
-    const { username } = req.body;
-
-    if (!username) {
-      res.status(400).json({ error: "username is required" });
-      return;
-    }
+  optionalAuth,
+  async (req: Request<{ id: string }>, res: Response) => {
+    const id = req.params.id;
 
     try {
       const stream = await db.stream.findUnique({
@@ -384,11 +423,33 @@ streamRouter.post(
         return;
       }
 
+      let ivsUserId: string;
+      let username: string;
+      let canSend = false;
+
+      if (req.auth?.sub) {
+        const dbUser = await db.user.findUnique({
+          where: { cognitoSub: req.auth.sub },
+        });
+        if (!dbUser) {
+          res.status(401).json({
+            error: "No profile found for this account. Try logging in again.",
+          });
+          return;
+        }
+        ivsUserId = dbUser.id;
+        username = dbUser.name ?? dbUser.email;
+        canSend = true;
+      } else {
+        ivsUserId = `guest-${crypto.randomUUID()}`;
+        username = "Guest";
+      }
+
       const token = await ivschat.send(
         new CreateChatTokenCommand({
           roomIdentifier: stream.user.ivsChatRoomArn,
-          userId: username,
-          capabilities: ["SEND_MESSAGE"],
+          userId: ivsUserId,
+          capabilities: canSend ? ["SEND_MESSAGE"] : [],
         }),
       );
 
@@ -396,6 +457,8 @@ streamRouter.post(
         token: token.token,
         sessionExpirationTime: token.sessionExpirationTime,
         tokenExpirationTime: token.tokenExpirationTime,
+        username,
+        canSend,
       });
     } catch (err) {
       console.error("POST /api/streams/:id/chat-token error:", err);
@@ -404,44 +467,53 @@ streamRouter.post(
   },
 );
 
-// Doesn't delete the IVS channel — it's persistent, reused by the user's next stream.
-streamRouter.put("/:id/end", async (req: Request, res: Response) => {
-  const id = req.params.id as string;
+// requires login and ownership. Doesn't delete the IVS channel — it's reused by the user's next stream.
+streamRouter.put(
+  "/:id/end",
+  requireAuth,
+  requireDbUser,
+  async (req: Request, res: Response) => {
+    const id = req.params.id as string;
 
-  try {
-    const stream = await db.stream.findUnique({
-      where: { id },
-      include: { user: true },
-    });
+    try {
+      const stream = await db.stream.findUnique({
+        where: { id },
+        include: { user: true },
+      });
 
-    if (!stream) {
-      res.status(404).json({ error: "Stream not found" });
-      return;
+      if (!stream) {
+        res.status(404).json({ error: "Stream not found" });
+        return;
+      }
+      if (stream.userId !== req.dbUser!.id) {
+        res.status(403).json({ error: "You don't own this stream" });
+        return;
+      }
+
+      if (stream.user.ivsChannelArn) {
+        try {
+          await ivs.send(
+            new StopStreamCommand({ channelArn: stream.user.ivsChannelArn }),
+          );
+        } catch {}
+      }
+
+      const updated = await db.stream.update({
+        where: { id },
+        data: { status: "ENDED", endedAt: new Date() },
+      });
+
+      broadcastToRoom(id, { type: "STREAM_ENDED", streamId: id });
+
+      res.json(updated);
+    } catch (err) {
+      console.error("PUT /api/streams/:id/end error:", err);
+      res.status(500).json({ error: errorMessage(err) });
     }
+  },
+);
 
-    if (stream.user.ivsChannelArn) {
-      try {
-        await ivs.send(
-          new StopStreamCommand({ channelArn: stream.user.ivsChannelArn }),
-        );
-      } catch {}
-    }
-
-    const updated = await db.stream.update({
-      where: { id },
-      data: { status: "ENDED", endedAt: new Date() },
-    });
-
-    broadcastToRoom(id, { type: "STREAM_ENDED", streamId: id });
-
-    res.json(updated);
-  } catch (err) {
-    console.error("PUT /api/streams/:id/end error:", err);
-    res.status(500).json({ error: errorMessage(err) });
-  }
-});
-
-// Channel identity lives on User, so find the user by channelArn first, then their current in-flight stream row.
+// called by AWS EventBridge, not a logged-in browser — locking this down later means IAM/signature verification, not requireAuth.
 streamRouter.post(
   "/webhook",
   async (req: Request<{}, {}, EventBridgeIvsEvent>, res: Response) => {
@@ -527,7 +599,7 @@ setInterval(async () => {
             type: "VIEWER_COUNT",
             count: ivsStream?.viewerCount ?? 0,
           });
-        } catch (err:any) {
+        } catch (err: any) {
           if (
             err.name !== "ChannelNotBroadcasting" &&
             err.Code !== "ChannelNotBroadcasting"

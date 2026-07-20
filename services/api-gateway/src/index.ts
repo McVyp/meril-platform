@@ -8,12 +8,14 @@ import { redis } from "./lib/redis";
 import { videoRouter } from "./routes/video";
 import { streamRouter } from "./routes/stream";
 import { setupWebSocket } from "./lib/ws";
+import { authRouter } from "./routes/auth";
 
 const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
+app.use("/api/auth", authRouter);
 app.use("/api/videos", videoRouter);
 app.use("/api/streams", streamRouter);
 
@@ -31,4 +33,3 @@ const PORT = process.env.PORT || 4000;
 const server = http.createServer(app);
 setupWebSocket(server);
 server.listen(PORT, () => console.log(`api-gateway running on :${PORT}`));
- 

@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@custom-variant dark (&:is(.dark *));
 @source "./**/*.{js,ts,jsx,tsx,mdx}";
 @source "../components/**/*.{js,ts,jsx,tsx,mdx}";
 @source "../hooks/**/*.{js,ts,jsx,tsx,mdx}";
@@ -20,6 +23,26 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-pixel-square: var(--font-geist-pixel-square);
+
+  --color-card: #171717;
+  --color-card-foreground: #ededed;
+  --color-popover: #171717;
+  --color-popover-foreground: #ededed;
+  --color-primary: #ededed;
+  --color-primary-foreground: #171717;
+  --color-secondary: #262626;
+  --color-secondary-foreground: #ededed;
+  --color-muted: #262626;
+  --color-muted-foreground: #a3a3a3;
+  --color-accent: #262626;
+  --color-accent-foreground: #ededed;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ededed;
+  --color-border: #262626;
+  --color-input: #262626;
+  --color-ring: #737373;
+  --radius: 0.625rem;
+  --radius-4xl: 2rem;
 }
 
 @media (prefers-color-scheme: dark) {

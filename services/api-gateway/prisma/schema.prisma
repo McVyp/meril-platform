@@ -20,6 +20,7 @@ model User {
   ivsPlaybackUrl    String?
   ivsStreamKey      String?
   ivsChatRoomArn    String?
+  cognitoSub        String?  @unique 
 
   videos  Video[]
   streams Stream[]

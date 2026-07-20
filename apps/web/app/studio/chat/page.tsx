@@ -19,9 +19,20 @@ function PoppedOutChat() {
     if (!streamId) return;
 
     const key = `studio-chat-open:${streamId}`;
-    localStorage.setItem(key, "1");
+    try {
+      localStorage.setItem(key, "1");
+    } catch (err) {
+      console.error("Failed to set chat-open flag:", err);
+    }
 
-    const clear = () => localStorage.removeItem(key);
+    const clear = () => {
+      try {
+        localStorage.removeItem(key);
+      } catch (err) {
+        console.error("Failed to clear chat-open flag:", err);
+      }
+    };
+    
     window.addEventListener("beforeunload", clear);
     window.addEventListener("pagehide", clear);
 
