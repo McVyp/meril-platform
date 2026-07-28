@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import VideoPlayer from "@/components/video-player";
-import { ChatPanel } from "@/components/chat-panel";
+import { getInitials } from "@/lib/get-initials";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   ResizablePanelGroup,
@@ -13,6 +13,10 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { WsMessage, PublicStream as Stream } from "@/types/stream";
+import { FollowButton } from "@/components/follow-button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSession } from "@/context/SessionContext";
+import { ChatPanel } from "@/components/chat-panel";
 
 const CHAT_COLLAPSED_KEY = "live-chat-collapsed";
 
@@ -24,8 +28,9 @@ export default function LivePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
-
+  const { id: currentUserId } = useSession();
   const [chatCollapsed, setChatCollapsed] = useState(false);
+
   useEffect(() => {
     try {
       setChatCollapsed(localStorage.getItem(CHAT_COLLAPSED_KEY) === "1");
@@ -33,7 +38,7 @@ export default function LivePage() {
       console.error("Failed to read chat-collapsed preference:", err);
     }
   }, []);
-  
+
   const toggleChat = useCallback(() => {
     setChatCollapsed((prev) => {
       const next = !prev;
@@ -126,6 +131,24 @@ export default function LivePage() {
               <h1 className="text-[1.5rem] lg:text-[1.6rem] font-semibold text-white truncate">
                 {stream.title}
               </h1>
+              <div className="flex items-center gap-3 mt-1">
+                <Avatar className="w-6 h-6">
+                  <AvatarImage
+                    src={stream.user.image ?? undefined}
+                    alt={stream.user.name ?? "Streamer"}
+                  />
+                  <AvatarFallback className="text-[1rem] bg-white/10 text-white/70">
+                    {getInitials(stream.user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-white/50 text-[1.2rem]">
+                  {stream.user.name ?? "Unknown streamer"}
+                </span>
+                <FollowButton
+                  targetUserId={stream.user.id}
+                  currentUserId={currentUserId}
+                />
+              </div>
               {isLive && (
                 <div className="lg:hidden flex items-center gap-1.5 text-[1.2rem] text-red-400 font-medium mt-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />

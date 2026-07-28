@@ -11,6 +11,7 @@ import {
 
 interface SessionState {
   loggedIn: boolean;
+  id: string | null;
   name: string | null;
   email: string | null;
   loaded: boolean;
@@ -25,6 +26,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({
     loggedIn: false,
+    id: null,
     name: null,
     email: null,
     loaded: false,
@@ -36,13 +38,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       setState({
         loggedIn: !!data.loggedIn,
+        id: data.id ?? null,
         name: data.name ?? null,
         email: data.email ?? null,
         loaded: true,
       });
     } catch (err) {
       console.error("Session refresh failed:", err);
-      setState({ loggedIn: false, name: null, email: null, loaded: true });
+      setState({
+        loggedIn: false,
+        id: null,
+        name: null,
+        email: null,
+        loaded: true,
+      });
     }
   }, []);
 

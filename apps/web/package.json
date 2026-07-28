@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1086.0",
@@ -17,7 +18,7 @@
     "hls.js": "^1.6.16",
     "jose": "^6.2.3",
     "lucide-react": "^1.21.0",
-    "next": "16.2.9",
+    "next": "16.2.11",
     "next-themes": "^0.4.6",
     "qrcode": "^1.5.4",
     "radix-ui": "^1.6.0",
@@ -36,7 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

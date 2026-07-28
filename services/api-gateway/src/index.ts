@@ -9,6 +9,8 @@ import { videoRouter } from "./routes/video";
 import { streamRouter } from "./routes/stream";
 import { setupWebSocket } from "./lib/ws";
 import { authRouter } from "./routes/auth";
+import { followRouter } from "./routes/follows";
+import { usersRouter } from "./routes/users";
 
 const app = express();
 
@@ -18,6 +20,8 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/videos", videoRouter);
 app.use("/api/streams", streamRouter);
+app.use("/api", followRouter);
+app.use("/api/users", usersRouter);
 
 app.get("/health", async (_req, res) => {
   try {

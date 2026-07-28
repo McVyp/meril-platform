@@ -7,6 +7,28 @@ import { requireAuth } from "../middleware/auth";
 
 export const authRouter = Router();
 
+function slugifyForUsername(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 20) || "user"
+  );
+}
+
+async function generateUniqueUsername(email: string): Promise<string> {
+  const base = slugifyForUsername(email.split("@")[0]);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate =
+      attempt === 0 ? base : `${base}${Math.floor(Math.random() * 100000)}`;
+    const clash = await db.user.findUnique({ where: { username: candidate } });
+    if (!clash) return candidate;
+  }
+
+  return `${base}${Date.now()}`;
+}
+
 // falls back to matching by email so a pre-existing row gets linked, not duplicated.
 authRouter.post("/sync", async (req: Request, res: Response) => {
   const header = req.headers.authorization;
@@ -37,8 +59,6 @@ authRouter.post("/sync", async (req: Request, res: Response) => {
       const existingByEmail = await db.user.findUnique({ where: { email } });
 
       if (existingByEmail && existingByEmail.cognitoSub) {
-        // Email matches, but that row is already linked to a different
-        // Cognito account — don't relink it out from under them.
         res
           .status(409)
           .json({ error: "Email already linked to another account" });
@@ -51,10 +71,11 @@ authRouter.post("/sync", async (req: Request, res: Response) => {
           data: { cognitoSub: sub },
         });
       } else {
+        const username = await generateUniqueUsername(email);
         user = await db.user.upsert({
           where: { cognitoSub: sub },
           update: {},
-          create: { email, cognitoSub: sub },
+          create: { email, cognitoSub: sub, username },
         });
       }
     }
@@ -66,14 +87,35 @@ authRouter.post("/sync", async (req: Request, res: Response) => {
   }
 });
 
-// only updates the caller's own name — userId always comes from req.dbUser, never the body.
+const socialLinkSchema = z.object({
+  platform: z.string().min(1).max(30),
+  url: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith("http://") || u.startsWith("https://"), {
+      message: "URL must start with http:// or https://",
+    }),
+});
+
 authRouter.patch(
   "/profile",
   requireAuth,
   requireDbUser,
   async (req: Request, res: Response) => {
     const schema = z.object({
-      name: z.string().trim().min(1).max(50),
+      name: z.string().trim().min(1).max(50).optional(),
+      username: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .regex(
+          /^[a-z0-9_-]+$/,
+          "Only lowercase letters, numbers, hyphens, and underscores",
+        )
+        .min(3)
+        .max(30)
+        .optional(),
+      socialLinks: z.array(socialLinkSchema).max(10).optional(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -83,27 +125,54 @@ authRouter.patch(
     }
 
     try {
+      if (parsed.data.username) {
+        const existing = await db.user.findUnique({
+          where: { username: parsed.data.username },
+        });
+        if (existing && existing.id !== req.dbUser!.id) {
+          res.status(409).json({ error: "Username already taken" });
+          return;
+        }
+      }
+
       const user = await db.user.update({
         where: { id: req.dbUser!.id },
-        data: { name: parsed.data.name },
+        data: {
+          ...(parsed.data.name && { name: parsed.data.name }),
+          ...(parsed.data.username && { username: parsed.data.username }),
+          ...(parsed.data.socialLinks && {
+            socialLinks: parsed.data.socialLinks,
+          }),
+        },
       });
-      res.json({ name: user.name });
-    } catch (err) {
+      res.json({
+        name: user.name,
+        username: user.username,
+        socialLinks: user.socialLinks,
+      });
+    } catch (err: any) {
+      // race: two requests claim the same username between the check above and this write
+      if (err.code === "P2002") {
+        res.status(409).json({ error: "Username already taken" });
+        return;
+      }
       console.error("PATCH /api/auth/profile error:", err);
       res.status(500).json({ error: "Failed to update profile" });
     }
   },
 );
 
-// returns only the caller's own name/email — no other user's data is reachable here.
 authRouter.get(
   "/me",
   requireAuth,
   requireDbUser,
   async (req: Request, res: Response) => {
     res.json({
+      id: req.dbUser!.id,
       name: req.dbUser!.name,
       email: req.dbUser!.email,
+      username: req.dbUser!.username,
+      socialLinks: req.dbUser!.socialLinks,
     });
   },
 );

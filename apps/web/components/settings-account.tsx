@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/context/SessionContext";
+import { FollowersSection, FollowingSection } from "./settings-followers";
 
 export function AccountSection({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { refresh } = useSession();
+  const { refresh, id } = useSession();
+  const [followTab, setFollowTab] = useState<"followers" | "following">(
+    "followers",
+  );
 
   async function handleLogOut() {
     try {
@@ -25,6 +29,44 @@ export function AccountSection({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex flex-col gap-6 p-1">
       <DisplayNameForm />
+
+      {id && (
+        <div className="border-t border-border pt-4">
+          <div className="inline-flex w-fit items-center gap-1 rounded-2xl bg-muted p-[3px]">
+            <button
+              type="button"
+              onClick={() => setFollowTab("followers")}
+              className={
+                followTab === "followers"
+                  ? "rounded-2xl bg-background px-3 py-1 text-sm font-medium text-foreground cursor-pointer"
+                  : "rounded-2xl px-3 py-1 text-sm font-medium text-foreground/60 hover:text-foreground cursor-pointer"
+              }
+            >
+              Followers
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowTab("following")}
+              className={
+                followTab === "following"
+                  ? "rounded-2xl bg-background px-3 py-1 text-sm font-medium text-foreground cursor-pointer"
+                  : "rounded-2xl px-3 py-1 text-sm font-medium text-foreground/60 hover:text-foreground cursor-pointer"
+              }
+            >
+              Following
+            </button>
+          </div>
+
+          <div className="pt-3">
+            {followTab === "followers" ? (
+              <FollowersSection userId={id} />
+            ) : (
+              <FollowingSection userId={id} />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="border-t border-border pt-4">
         <Button
           type="button"

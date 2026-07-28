@@ -11,7 +11,10 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  username  String?  @unique
   image     String?
+  bio       String?
+  bannerUrl String?
   role      Role     @default(VIEWER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -22,8 +25,12 @@ model User {
   ivsChatRoomArn    String?
   cognitoSub        String?  @unique 
 
-  videos  Video[]
-  streams Stream[]
+  socialLinks Json?
+
+  videos    Video[]
+  streams   Stream[]
+  following Follow[] @relation("Follower")
+  followers Follow[] @relation("Following")
 }
 
 model Video {
@@ -56,6 +63,19 @@ model Stream {
   updatedAt   DateTime     @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower", fields: [followerId], references: [id])
+  following User @relation("Following", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
 }
 
 enum Role {

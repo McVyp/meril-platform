@@ -23,7 +23,6 @@ const BUCKET = process.env.S3_RAW_BUCKET!;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
-// public — anyone can browse the video catalog. Cursor-paginated via ?cursor=<videoId>&limit=n.
 videoRouter.get("/", async (req, res) => {
   try {
     const querySchema = z.object({
@@ -226,6 +225,11 @@ videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
       });
     } catch (temporalErr) {
       console.error("Failed to start transcode workflow:", temporalErr);
+      await db.video.update({
+        where: { id: video.id },
+        data: { status: "FAILED" },
+      });
+      video = { ...video, status: "FAILED" };
     }
 
     res.status(201).json(video);

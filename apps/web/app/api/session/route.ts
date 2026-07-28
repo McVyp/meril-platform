@@ -38,9 +38,10 @@ export async function GET() {
     const claims = decodeJwt(idToken);
     email = typeof claims.email === "string" ? claims.email : null;
   } catch (err) {
-    console.error("Failed to decode idToken:", err);
+    console.error("decodeJwt failed:", err);
   }
 
+  let id: string | null = null;
   let name: string | null = null;
   try {
     const res = await fetch(`${API_URL}/api/auth/me`, {
@@ -49,14 +50,15 @@ export async function GET() {
     });
     if (res.ok) {
       const data = await res.json();
+      id = typeof data.id === "string" ? data.id : null;
       name = typeof data.name === "string" ? data.name : null;
       email = data.email ?? email;
     }
   } catch (err) {
-    console.error("Failed to fetch /api/auth/me:", err);
+    console.error("GET /api/auth/me failed:", err);
   }
 
-  return NextResponse.json({ loggedIn: true, email, name });
+  return NextResponse.json({ loggedIn: true, id, email, name });
 }
 
 export async function DELETE() {

@@ -50,7 +50,9 @@ export default function SettingsModal({
           >
             <TabsTrigger
               value="account"
-              className={isDesktop ? "justify-start text-[1.4rem] cursor-pointer" : ""}
+              className={
+                isDesktop ? "justify-start text-[1.4rem] cursor-pointer" : ""
+              }
             >
               Account
             </TabsTrigger>

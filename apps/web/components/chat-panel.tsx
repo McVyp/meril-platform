@@ -92,7 +92,9 @@ export function ChatPanel({
         {
           id: message.id,
           username:
-            (message.sender?.attributes?.username as string) ?? "unknown",
+            (message.sender?.attributes?.displayName as string) ??
+            (message.sender?.attributes?.username as string) ??
+            "unknown",
           message: message.content,
         },
       ]);

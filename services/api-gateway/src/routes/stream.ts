@@ -143,7 +143,10 @@ async function reconcileActiveStreams(): Promise<
     }
   }
 
-  const result = new Map<string, { status: string; playbackUrl: string | null }>();
+  const result = new Map<
+    string,
+    { status: string; playbackUrl: string | null }
+  >();
 
   await Promise.all(
     active.map(async (s) => {
@@ -221,7 +224,7 @@ async function reconcileActiveStreams(): Promise<
 
   return result;
 }
-// public — anyone can browse live/recent streams without logging in.
+
 streamRouter.get("/", async (req: Request, res: Response) => {
   try {
     const querySchema = z.object({
@@ -332,14 +335,23 @@ streamRouter.get(
   },
 );
 
-// public — anyone can watch/view a specific stream's details.
 streamRouter.get("/:id", async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
   try {
     const stream = await db.stream.findUnique({
       where: { id },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            ivsPlaybackUrl: true,
+            ivsChannelArn: true,
+          },
+        },
+      },
     });
 
     if (!stream) {
@@ -363,14 +375,19 @@ streamRouter.get("/:id", async (req: Request, res: Response) => {
       } catch {}
     }
 
-    res.json({ ...stream, playbackUrl: stream.user.ivsPlaybackUrl });
+    const { ivsChannelArn, ...safeUser } = stream.user;
+
+    res.json({
+      ...stream,
+      user: safeUser,
+      playbackUrl: stream.user.ivsPlaybackUrl,
+    });
   } catch (err) {
     console.error("GET /api/streams/:id error:", err);
     res.status(500).json({ error: errorMessage(err) });
   }
 });
 
-// requires login and ownership.
 streamRouter.patch(
   "/:id",
   requireAuth,
@@ -425,6 +442,7 @@ streamRouter.post(
 
       let ivsUserId: string;
       let username: string;
+      let displayName: string;
       let canSend = false;
 
       if (req.auth?.sub) {
@@ -438,11 +456,14 @@ streamRouter.post(
           return;
         }
         ivsUserId = dbUser.id;
-        username = dbUser.name ?? dbUser.email;
+        username = dbUser.username ?? dbUser.id;
+        displayName = dbUser.name ?? dbUser.email;
         canSend = true;
       } else {
+        const guestSuffix = crypto.randomUUID().slice(0, 6);
         ivsUserId = `guest-${crypto.randomUUID()}`;
-        username = "Guest";
+        username = `guest_${guestSuffix}`;
+        displayName = `Guest ${guestSuffix}`;
       }
 
       const token = await ivschat.send(
@@ -450,6 +471,7 @@ streamRouter.post(
           roomIdentifier: stream.user.ivsChatRoomArn,
           userId: ivsUserId,
           capabilities: canSend ? ["SEND_MESSAGE"] : [],
+          attributes: { username, displayName },
         }),
       );
 
@@ -458,6 +480,7 @@ streamRouter.post(
         sessionExpirationTime: token.sessionExpirationTime,
         tokenExpirationTime: token.tokenExpirationTime,
         username,
+        displayName,
         canSend,
       });
     } catch (err) {
@@ -467,7 +490,7 @@ streamRouter.post(
   },
 );
 
-// requires login and ownership. Doesn't delete the IVS channel — it's reused by the user's next stream.
+// doesn't delete the IVS channel — it's reused by the user's next stream.
 streamRouter.put(
   "/:id/end",
   requireAuth,

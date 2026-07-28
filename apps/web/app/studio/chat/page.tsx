@@ -32,7 +32,7 @@ function PoppedOutChat() {
         console.error("Failed to clear chat-open flag:", err);
       }
     };
-    
+
     window.addEventListener("beforeunload", clear);
     window.addEventListener("pagehide", clear);
 
