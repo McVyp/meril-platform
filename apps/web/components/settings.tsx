@@ -11,6 +11,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSession } from "@/context/SessionContext";
 import { AccountSection } from "./settings-account";
 import { SecuritySection } from "./settings-security";
+import { customScrollbar } from "@/lib/scrollbar";
 
 export default function SettingsModal({
   open,
@@ -64,7 +65,7 @@ export default function SettingsModal({
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className={`flex-1 overflow-y-auto ${customScrollbar}`}>
             <TabsContent value="account">
               <AccountSection onClose={onClose} />
             </TabsContent>

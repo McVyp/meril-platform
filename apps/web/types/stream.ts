@@ -17,6 +17,7 @@ export interface StudioStreamData extends StreamCredentials {
 export interface PublicUser {
   id: string;
   name: string | null;
+  username: string | null;
   image: string | null;
 }
 

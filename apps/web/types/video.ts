@@ -2,7 +2,7 @@ export interface VideoData {
   id: string;
   title: string;
   description: string;
-  videoUrl: string;
+  videoUrl: string | null;
   hlsUrl: string | null;
   type: "video" | "live";
 }

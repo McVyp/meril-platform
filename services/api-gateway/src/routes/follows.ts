@@ -97,7 +97,9 @@ followRouter.get(
         take: limit + 1,
         ...(cursor && { cursor: { id: cursor }, skip: 1 }),
         include: {
-          follower: { select: { id: true, name: true, image: true } },
+          follower: {
+            select: { id: true, name: true, username: true, image: true },
+          },
         },
       });
 
@@ -138,7 +140,9 @@ followRouter.get(
         take: limit + 1,
         ...(cursor && { cursor: { id: cursor }, skip: 1 }),
         include: {
-          following: { select: { id: true, name: true, image: true } },
+          following: {
+            select: { id: true, name: true, username: true, image: true },
+          },
         },
       });
 

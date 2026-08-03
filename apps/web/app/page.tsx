@@ -3,36 +3,120 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Title from "@/components/title";
 import Video from "@/components/video";
-import { videoData } from "@/data/videos";
 import { ApiVideo, VideoData } from "@/types/video";
-import { Clapperboard, TriangleAlert } from "lucide-react";
 import { useVideoCache } from "@/hooks/useVideoCache";
+import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import "./globals.css";
 import UserMenu from "@/components/userMenu";
 import { PublicStream } from "@/types/stream";
+import { SearchBar, SearchStatus } from "@/components/searchBar";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function Home() {
   const router = useRouter();
-  const [items, setItems] = useState<VideoData[]>(videoData);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
-  const currentIdRef = useRef<string | number | null>(videoData[0]?.id ?? null);
+  const lastShownItemRef = useRef<VideoData | null>(null);
+  const [items, setItems] = useState<VideoData[]>([]);
+  const currentIdRef = useRef<string | number | null>(null);
+  const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
 
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const nextCursorRef = useRef<string | null>(null);
   const isFetchingMoreRef = useRef(false);
   const hasMoreRef = useRef(true);
 
-  const wheelRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef(0);
-  const lastTouchTime = useRef(0);
-  const touchMoved = useRef(false);
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchResults, setSearchResults] = useState<VideoData[] | null>(null);
 
-  const nextItem = items[(currentIndex + 1) % items.length];
-  const prevItem = items[(currentIndex - 1 + items.length) % items.length];
+  const displayedItems = searchResults ?? items;
 
-  const currentItem = items[currentIndex];
-  const currentFailed = failedVideos.has(currentIndex);
+  const mapApiVideos = (videos: ApiVideo[]): VideoData[] =>
+    videos
+      .filter((v): v is ApiVideo & { playbackUrl?: string; hlsUrl?: string } =>
+        Boolean(v.playbackUrl ?? v.hlsUrl),
+      )
+      .map((v) => ({
+        id: v.id,
+        title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
+        description: v.description ?? "",
+        videoUrl: v.playbackUrl ?? v.hlsUrl!,
+        hlsUrl: v.hlsUrl ?? null,
+        type: "video" as const,
+      }));
+
+  const mapSearchResults = (videos: ApiVideo[]): VideoData[] =>
+    videos.map((v) => ({
+      id: v.id,
+      title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
+      description: v.description ?? "",
+      videoUrl: v.playbackUrl ?? v.hlsUrl ?? null,
+      hlsUrl: v.hlsUrl ?? null,
+      type: "video" as const,
+    }));
+
+  const fetchMoreVideos = useCallback(() => {
+    if (isFetchingMoreRef.current || !hasMoreRef.current) return;
+    isFetchingMoreRef.current = true;
+
+    const url = nextCursorRef.current
+      ? `/api/videos?cursor=${encodeURIComponent(nextCursorRef.current)}`
+      : "/api/videos";
+
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Failed to fetch videos: ${r.status}`);
+        return r.json();
+      })
+      .then((data: { videos: ApiVideo[]; nextCursor: string | null }) => {
+        nextCursorRef.current = data.nextCursor;
+        hasMoreRef.current = data.nextCursor !== null;
+
+        const dbVideos = mapApiVideos(data.videos);
+        if (dbVideos.length === 0) return;
+
+        setItems((prev) => {
+          const live = prev.filter((i) => i.type === "live");
+          const existingDb = prev.filter((i) => i.type === "video");
+          return [...live, ...existingDb, ...dbVideos];
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to fetch more videos:", err);
+      })
+      .finally(() => {
+        isFetchingMoreRef.current = false;
+      });
+  }, []);
+
+  const {
+    currentIndex,
+    setCurrentIndex,
+    isTransitioning,
+    wheelRef,
+    touchMoved,
+    handleTouchStart,
+    handleTouchEnd,
+  } = useSwipeNavigation(
+    displayedItems.length,
+    (next) => {
+      currentIdRef.current = displayedItems[next]?.id ?? null;
+    },
+    () => {
+      if (!searchResults) fetchMoreVideos();
+    },
+  );
+
+  const nextItem = displayedItems[(currentIndex + 1) % displayedItems.length];
+  const prevItem =
+    displayedItems[
+      (currentIndex - 1 + displayedItems.length) % displayedItems.length
+    ];
+  const currentItem = displayedItems[currentIndex] ?? lastShownItemRef.current;
+
+  useEffect(() => {
+    if (displayedItems[currentIndex]) {
+      lastShownItemRef.current = displayedItems[currentIndex];
+    }
+  }, [displayedItems, currentIndex]);
 
   const urlsToCache = useMemo(
     () =>
@@ -44,89 +128,25 @@ export default function Home() {
 
   useVideoCache(urlsToCache);
 
-  const mapApiVideos = (videos: ApiVideo[]): VideoData[] =>
-    videos
-      .filter((v): v is ApiVideo & { playbackUrl: string } =>
-        Boolean(v.playbackUrl),
-      )
-      .map((v) => ({
-        id: v.id,
-        title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
-        description: v.description ?? "",
-        videoUrl: v.playbackUrl,
-        hlsUrl: v.hlsUrl ?? null,
-        type: "video" as const,
-      }));
-
-  const fetchMoreVideos = useCallback(() => {
-    if (isFetchingMoreRef.current || !hasMoreRef.current) return;
-    isFetchingMoreRef.current = true;
-
-    const url = nextCursorRef.current
-      ? `/api/videos?cursor=${encodeURIComponent(nextCursorRef.current)}`
-      : "/api/videos";
-
-    fetch(url)
-      .then((r) => r.json())
-      .then((data: { videos: ApiVideo[]; nextCursor: string | null }) => {
-        nextCursorRef.current = data.nextCursor;
-        hasMoreRef.current = data.nextCursor !== null;
-
-        const dbVideos = mapApiVideos(data.videos);
-        if (dbVideos.length === 0) return;
-
-        setItems((prev) => {
-          const live = prev.filter((i) => i.type === "live");
-          const existingDb = prev.filter(
-            (i) => i.type === "video" && !videoData.some((v) => v.id === i.id),
-          );
-          const filler = prev.filter((i) =>
-            videoData.some((v) => v.id === i.id),
-          );
-          const merged = [...live, ...existingDb, ...dbVideos, ...filler];
-          const idx = merged.findIndex((i) => i.id === currentIdRef.current);
-          if (idx !== -1) setCurrentIndex(idx);
-          return merged;
-        });
-      })
-      .catch((err) => {
-        console.error("Failed to fetch more videos:", err);
-      })
-      .finally(() => {
-        isFetchingMoreRef.current = false;
-      });
-  }, []);
-
-  const navigateToIndex = useCallback(
-    (direction: "next" | "prev") => {
-      if (isTransitioning || items.length === 0) return;
-      setIsTransitioning(true);
-      setCurrentIndex((prev) => {
-        const next =
-          direction === "next"
-            ? (prev + 1) % items.length
-            : (prev - 1 + items.length) % items.length;
-        currentIdRef.current = items[next]?.id ?? null;
-
-        // approaching the end of loaded items — fetch the next page.
-        if (direction === "next" && next >= items.length - 3) {
-          fetchMoreVideos();
-        }
-        return next;
-      });
-      setTimeout(() => setIsTransitioning(false), 800);
-    },
-    [isTransitioning, items.length, fetchMoreVideos],
-  );
-
   useEffect(() => {
     fetchMoreVideos();
   }, [fetchMoreVideos]);
 
   useEffect(() => {
+    if (!currentIdRef.current && items.length > 0) {
+      currentIdRef.current = items[0].id;
+    }
+    const idx = items.findIndex((i) => i.id === currentIdRef.current);
+    if (idx !== -1) setCurrentIndex(idx);
+  }, [items, setCurrentIndex]);
+
+  useEffect(() => {
     const fetchStreams = () => {
       fetch(`/api/streams`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`Failed to fetch streams: ${r.status}`);
+          return r.json();
+        })
         .then(
           (data: { streams: PublicStream[]; nextCursor: string | null }) => {
             const streams = data.streams;
@@ -155,12 +175,7 @@ export default function Home() {
               const newLive = liveStreams.filter(
                 (s) => !withoutStaleLive.some((i) => i.id === s.id),
               );
-              const merged = [...newLive, ...withoutStaleLive];
-              const idx = merged.findIndex(
-                (i) => i.id === currentIdRef.current,
-              );
-              if (idx !== -1) setCurrentIndex(idx);
-              return merged;
+              return [...newLive, ...withoutStaleLive];
             });
           },
         )
@@ -174,38 +189,12 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const el = wheelRef.current;
-    if (!el) return;
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      navigateToIndex(e.deltaY > 0 ? "next" : "prev");
-    };
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, [navigateToIndex]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-    lastTouchTime.current = Date.now();
-    touchMoved.current = false;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const distance = touchStartY.current - e.changedTouches[0].clientY;
-    const duration = Date.now() - lastTouchTime.current;
-    if (Math.abs(distance) > 50 && duration < 300) {
-      touchMoved.current = true;
-      navigateToIndex(distance > 0 ? "next" : "prev");
-    }
-  };
-
   const handleTitleClick = (index: number) => {
     if (touchMoved.current) {
       touchMoved.current = false;
       return;
     }
-    const item = items[index];
+    const item = displayedItems[index];
     if (!item?.videoUrl) return;
     currentIdRef.current = item.id;
     setCurrentIndex(index);
@@ -229,6 +218,14 @@ export default function Home() {
     router.push("/watch");
   };
 
+  if (displayedItems.length === 0 && !searchActive) {
+    return (
+      <div className="h-dvh bg-black flex items-center justify-center text-white/40 text-[1.4rem]">
+        Loading videos...
+      </div>
+    );
+  }
+
   return (
     <div
       className="h-screen w-full relative bg-black overflow-hidden"
@@ -237,58 +234,88 @@ export default function Home() {
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: "none" }}
     >
-      {currentItem.videoUrl && !currentFailed ? (
+      {currentItem?.videoUrl && (
         <Video
           videoUrl={currentItem.videoUrl}
-          nextVideoUrl={nextItem?.videoUrl}
+          nextVideoUrl={nextItem?.videoUrl ?? undefined}
           isTransitioning={isTransitioning}
           isLoaded={true}
           isLive={currentItem.type === "live"}
           isNextLive={nextItem?.type === "live"}
         />
-      ) : (
-        <div className="h-full w-full bg-gradient-to-br from-gray-900 via-gray-900 to-black flex items-center justify-center">
-          <div className="text-center text-white">
-            <div className="text-6xl mb-6 flex justify-center">
-              {currentFailed ? <TriangleAlert /> : <Clapperboard />}
-            </div>
-            <h2 className="text-3xl font-bold mb-4">{currentItem.title}</h2>
-            <p className="text-gray-300 max-w-md">
-              {currentFailed ? "Video failed to load" : currentItem.description}
-            </p>
-            {currentFailed && (
-              <button
-                onClick={() =>
-                  setFailedVideos((prev) => {
-                    const s = new Set(prev);
-                    s.delete(currentIndex);
-                    return s;
-                  })
-                }
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              >
-                Retry
-              </button>
-            )}
-          </div>
-        </div>
       )}
 
       <div className="absolute top-4 left-4 z-30">
         <UserMenu />
       </div>
-      <div className="absolute top-1/10 bottom-1/2 right-1/6 z-20 p-8 ">
-        <Title
-          currentIndex={currentIndex}
-          allTitles={items.map((i) => i.title)}
-          itemIds={items.map((i) => i.id)}
-          liveFlags={items.map((i) => i.type === "live")}
-          onSelect={handleTitleClick}
-        />
-      </div>
 
+      {isDesktop && (
+        <div className="absolute top-20 left-4 ml-8 z-30 flex items-start gap-2">
+          <SearchBar<ApiVideo>
+            active={searchActive}
+            onActiveChange={setSearchActive}
+            onResults={(results) => {
+              setSearchResults(results ? mapSearchResults(results) : null);
+              setCurrentIndex(0);
+            }}
+            onStatusChange={setSearchStatus}
+            fetchResults={(query, signal) =>
+              fetch(`/api/videos/search?q=${encodeURIComponent(query)}`, {
+                signal,
+              })
+                .then((r) => {
+                  if (!r.ok) throw new Error(`Search failed: ${r.status}`);
+                  return r.json();
+                })
+                .then((data: { videos: ApiVideo[] }) => data.videos)
+            }
+            placeholder="Search..."
+          />
+        </div>
+      )}
+
+      <div className="absolute top-[7%] right-1/6 z-30 p-8 flex flex-col items-start gap-4 min-w-[20vw]">
+        {!isDesktop && (
+          <SearchBar<ApiVideo>
+            active={searchActive}
+            onActiveChange={setSearchActive}
+            onResults={(results) => {
+              setSearchResults(results ? mapSearchResults(results) : null);
+              setCurrentIndex(0);
+            }}
+            onStatusChange={setSearchStatus}
+            fetchResults={(query, signal) =>
+              fetch(`/api/videos/search?q=${encodeURIComponent(query)}`, {
+                signal,
+              })
+                .then((r) => {
+                  if (!r.ok) throw new Error(`Search failed: ${r.status}`);
+                  return r.json();
+                })
+                .then((data: { videos: ApiVideo[] }) => data.videos)
+            }
+            placeholder="Search..."
+          />
+        )}
+
+        {searchStatus === "searching" ? (
+          <p className="text-white/40 text-[3rem]">Searching...</p>
+        ) : searchStatus === "empty" ? (
+          <p className="text-white/40 text-[3rem]">Not found</p>
+        ) : (
+          <Title
+            currentIndex={currentIndex}
+            allTitles={displayedItems.map((i) => i.title)}
+            itemIds={displayedItems.map((i) => i.id)}
+            liveFlags={displayedItems.map((i) => i.type === "live")}
+            onSelect={handleTitleClick}
+          />
+        )}
+      </div>
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 text-white/60 text-sm animate-pulse">
-        <span className="hidden sm:inline">Scroll to explore</span>
+        <span className="hidden sm:inline">
+          Scroll to explore · Press / to search
+        </span>
         <span className="sm:hidden">Swipe to explore</span>
       </div>
     </div>

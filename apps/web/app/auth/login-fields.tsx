@@ -1,6 +1,5 @@
 "use client";
-
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,8 +9,9 @@ import {
   respondToMfaCode,
 } from "@/lib/auth/cognito-client";
 import { completeLogin } from "@/lib/auth/complete-login";
+import { useSession } from "@/context/SessionContext";
 
-export function LoginFields({
+function LoginFieldsComponent({
   email,
   onEmailChange,
   onLoadingChange,
@@ -25,6 +25,7 @@ export function LoginFields({
   onForgotPassword: () => void;
 }) {
   const router = useRouter();
+  const { refresh } = useSession();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +45,7 @@ export function LoginFields({
 
       if (result.tokens?.idToken) {
         await completeLogin(result.tokens);
+        await refresh();
         router.push(returnTo);
         return;
       }
@@ -59,6 +61,7 @@ export function LoginFields({
       setError("Sign-in did not complete. Unexpected response from Cognito.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed.");
+      setPassword("");
     } finally {
       onLoadingChange(false);
     }
@@ -73,6 +76,7 @@ export function LoginFields({
       const result = await respondToMfaCode(email, mfaCode, mfaSession);
       if (result.tokens?.idToken) {
         await completeLogin(result.tokens);
+        await refresh();
         router.push(returnTo);
         return;
       }
@@ -170,3 +174,5 @@ export function LoginFields({
     </form>
   );
 }
+
+export const LoginFields = memo(LoginFieldsComponent);

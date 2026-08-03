@@ -11,6 +11,32 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Unknown error";
 }
 
+async function attachFallbackVideos<
+  T extends { id: string; bannerUrl: string | null },
+>(users: T[]): Promise<(T & { latestVideoUrl: string | null })[]> {
+  const needsFallback = users.filter((u) => !u.bannerUrl).map((u) => u.id);
+
+  const fallbackVideos = needsFallback.length
+    ? await db.video.findMany({
+        where: { userId: { in: needsFallback }, status: "READY" },
+        orderBy: { createdAt: "desc" },
+        select: { userId: true, hlsUrl: true },
+      })
+    : [];
+
+  const latestByUser = new Map<string, string | null>();
+  for (const v of fallbackVideos) {
+    if (v.userId && !latestByUser.has(v.userId)) {
+      latestByUser.set(v.userId, v.hlsUrl);
+    }
+  }
+
+  return users.map((user) => ({
+    ...user,
+    latestVideoUrl: user.bannerUrl ? null : (latestByUser.get(user.id) ?? null),
+  }));
+}
+
 // counts computed on read via _count, same as the followers lists — no denormalization until there's a real reason for one.
 usersRouter.get(
   "/:userId/profile",
@@ -76,6 +102,45 @@ usersRouter.get(
   },
 );
 
+usersRouter.get("/search", async (req: Request, res: Response) => {
+  try {
+    const querySchema = z.object({
+      q: z.string().trim().min(1).max(100),
+      limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
+    });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+    const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
+
+    const users = await db.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { username: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        image: true,
+        bannerUrl: true,
+      },
+    });
+
+    const usersWithFallback = await attachFallbackVideos(users);
+
+    res.json({ users: usersWithFallback });
+  } catch (err) {
+    console.error("GET /api/users/search error:", err);
+    res.status(500).json({ error: errorMessage(err) });
+  }
+});
+
 usersRouter.get("/", async (req: Request, res: Response) => {
   try {
     const querySchema = z.object({
@@ -93,27 +158,20 @@ usersRouter.get("/", async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-      select: { id: true, name: true, image: true, bannerUrl: true },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        image: true,
+        bannerUrl: true,
+      },
     });
 
     const hasMore = users.length > limit;
     const page = hasMore ? users.slice(0, limit) : users;
 
     // resolve each user's most recent READY video as a fallback background
-    const usersWithFallback = await Promise.all(
-      page.map(async (user) => {
-        let latestVideoUrl: string | null = null;
-        if (!user.bannerUrl) {
-          const latestVideo = await db.video.findFirst({
-            where: { userId: user.id, status: "READY" },
-            orderBy: { createdAt: "desc" },
-            select: { hlsUrl: true },
-          });
-          latestVideoUrl = latestVideo?.hlsUrl ?? null;
-        }
-        return { ...user, latestVideoUrl };
-      }),
-    );
+    const usersWithFallback = await attachFallbackVideos(page);
 
     res.json({
       users: usersWithFallback,

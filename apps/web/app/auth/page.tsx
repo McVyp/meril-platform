@@ -1,6 +1,5 @@
 "use client";
-
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +16,25 @@ import { SignUpFields } from "./signup-fields";
 import { LoginFields } from "./login-fields";
 import { ForgotPasswordFields } from "./forgot-password-fields";
 import { customScrollbar } from "@/lib/scrollbar";
+import { useSession } from "@/context/SessionContext";
+
+const TITLES: Record<
+  "login" | "signup" | "forgot",
+  { title: string; description: string }
+> = {
+  login: {
+    title: "Log in to your account",
+    description: "Enter your email and password below.",
+  },
+  signup: {
+    title: "Create an account",
+    description: "Enter your email and choose a password.",
+  },
+  forgot: {
+    title: "Reset your password",
+    description: "We'll email you a code to set a new password.",
+  },
+};
 
 export default function AuthPage() {
   return (
@@ -28,6 +46,7 @@ export default function AuthPage() {
 
 function AuthPageInner() {
   const router = useRouter();
+  const { refresh } = useSession();
   const searchParams = useSearchParams();
   const rawReturnTo = searchParams.get("returnTo");
   // only allow same-origin relative paths — prevents an open-redirect if
@@ -41,6 +60,9 @@ function AuthPageInner() {
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
 
   const formId = tab === "login" ? "login-form" : "signup-form";
+
+  const handleForgotPassword = useCallback(() => setTab("forgot"), []);
+  const handleBackToLogin = useCallback(() => setTab("login"), []);
 
   async function handlePasskeySignIn() {
     setPasskeyError(null);
@@ -57,6 +79,7 @@ function AuthPageInner() {
 
       if (result.tokens?.idToken) {
         await completeLogin(result.tokens);
+        await refresh();
         router.push(returnTo);
         return;
       }
@@ -71,28 +94,13 @@ function AuthPageInner() {
     }
   }
 
-  const titles: Record<typeof tab, { title: string; description: string }> = {
-    login: {
-      title: "Log in to your account",
-      description: "Enter your email and password below.",
-    },
-    signup: {
-      title: "Create an account",
-      description: "Enter your email and choose a password.",
-    },
-    forgot: {
-      title: "Reset your password",
-      description: "We'll email you a code to set a new password.",
-    },
-  };
-
   return (
     <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full md:w-[400px]">
         <CardHeader>
-          <CardTitle className="text-[1.4rem]">{titles[tab].title}</CardTitle>
+          <CardTitle className="text-[1.4rem]">{TITLES[tab].title}</CardTitle>
           <CardDescription className="text-[1.2rem]">
-            {titles[tab].description}
+            {TITLES[tab].description}
           </CardDescription>
         </CardHeader>
 
@@ -131,14 +139,14 @@ function AuthPageInner() {
                 onEmailChange={setEmail}
                 onLoadingChange={setLoading}
                 returnTo={returnTo}
-                onForgotPassword={() => setTab("forgot")}
+                onForgotPassword={handleForgotPassword}
               />
             ) : tab === "signup" ? (
               <SignUpFields onLoadingChange={setLoading} />
             ) : (
               <ForgotPasswordFields
                 onLoadingChange={setLoading}
-                onBackToLogin={() => setTab("login")}
+                onBackToLogin={handleBackToLogin}
               />
             )}
           </div>

@@ -1,6 +1,5 @@
 "use client";
-
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,7 +7,7 @@ import {
   confirmForgotPassword,
 } from "@/lib/auth/cognito-client";
 
-export function ForgotPasswordFields({
+function ForgotPasswordFieldsComponent({
   onLoadingChange,
   onBackToLogin,
 }: {
@@ -57,6 +56,8 @@ export function ForgotPasswordFields({
         err instanceof Error ? err.message : "Could not reset password.",
       );
     } finally {
+      setNewPassword("");
+      setConfirmNewPassword("");
       onLoadingChange(false);
     }
   }
@@ -193,3 +194,5 @@ export function ForgotPasswordFields({
     </form>
   );
 }
+
+export const ForgotPasswordFields = memo(ForgotPasswordFieldsComponent);

@@ -1,6 +1,5 @@
 "use client";
-
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -9,7 +8,7 @@ import {
   resendConfirmationCode,
 } from "@/lib/auth/cognito-client";
 
-export function SignUpFields({
+function SignUpFieldsComponent({
   onLoadingChange,
 }: {
   onLoadingChange: (loading: boolean) => void;
@@ -35,8 +34,12 @@ export function SignUpFields({
     try {
       await signUp(email, password);
       setStep("confirm");
+      setPassword("");
+      setConfirmPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-up failed.");
+      setPassword("");
+      setConfirmPassword("");
     } finally {
       onLoadingChange(false);
     }
@@ -164,3 +167,5 @@ export function SignUpFields({
     </form>
   );
 }
+
+export const SignUpFields = memo(SignUpFieldsComponent);

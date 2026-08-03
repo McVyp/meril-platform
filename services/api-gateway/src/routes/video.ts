@@ -23,6 +23,44 @@ const BUCKET = process.env.S3_RAW_BUCKET!;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
+videoRouter.get("/search", async (req, res) => {
+  try {
+    const querySchema = z.object({
+      q: z.string().trim().min(1).max(100),
+      limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
+    });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+    const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
+
+    const videos = await db.video.findMany({
+      where: {
+        status: "READY",
+        title: { contains: q, mode: "insensitive" },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        thumbnailUrl: true,
+        hlsUrl: true,
+        duration: true,
+        viewCount: true,
+        userId: true,
+      },
+    });
+
+    res.json({ videos });
+  } catch (err) {
+    console.error("GET /api/videos/search error:", err);
+    res.status(500).json({ error: "Failed to search videos" });
+  }
+});
+
 videoRouter.get("/", async (req, res) => {
   try {
     const querySchema = z.object({
@@ -62,6 +100,7 @@ videoRouter.get("/", async (req, res) => {
       nextCursor: hasMore ? page[page.length - 1].id : null,
     });
   } catch (err) {
+    console.error("GET /api/videos error:", err);
     res.status(500).json({ error: "Failed to fetch videos" });
   }
 });
@@ -100,6 +139,7 @@ videoRouter.post(
       );
       res.json({ videoId, presignedUrl, s3Key });
     } catch (err) {
+      console.error("POST /api/videos/upload-url error:", err);
       res.status(500).json({ error: "Failed to generate upload URL" });
     }
   },
@@ -158,6 +198,7 @@ videoRouter.get("/:id/status", async (req, res) => {
     }
     res.json({ status: "PROCESSING", hlsUrl: null });
   } catch (err) {
+    console.error("GET /api/videos/:id/status error:", err);
     res.status(500).json({ error: "Failed to get video status" });
   }
 });

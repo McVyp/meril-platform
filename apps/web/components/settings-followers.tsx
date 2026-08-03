@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +27,7 @@ function UserCard({
   return (
     <div className="flex items-center justify-between gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-white/5 transition-colors">
       <Link
-        href={`/creators/${user.id}`}
+        href={`/creators/${user.username ?? user.id}`}
         onClick={onNavigate}
         className="flex items-center gap-3 min-w-0"
       >
@@ -74,26 +73,38 @@ function FollowList({
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
 
-  const fetchPage = async (after?: string | null) => {
+  const fetchPage = async (
+    after?: string | null,
+    cancelledRef?: { current: boolean },
+  ) => {
     const qs = after ? `?cursor=${after}` : "";
     const res = await fetch(`/api/users/${userId}/${kind}${qs}`);
     if (!res.ok) throw new Error(`Failed to load ${kind}: ${res.status}`);
     const data: FollowListResponse = await res.json();
+    if (cancelledRef?.current) return;
     const page = data[kind] ?? [];
     setUsers((prev) => (after ? [...prev, ...page] : page));
     setCursor(data.nextCursor);
   };
 
   useEffect(() => {
+    const cancelledRef = { current: false };
     setLoading(true);
     setError(false);
-    fetchPage()
+    fetchPage(undefined, cancelledRef)
       .catch((err) => {
-        console.error(`Failed to load ${kind}:`, err);
-        setError(true);
+        if (!cancelledRef.current) {
+          console.error(`Failed to load ${kind}:`, err);
+          setError(true);
+        }
       })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .finally(() => {
+        if (!cancelledRef.current) setLoading(false);
+      });
+
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [userId, kind]);
 
   const handleLoadMore = async () => {

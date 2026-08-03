@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
@@ -58,6 +57,8 @@ export function ChatPanel({
   const [triedToSend, setTriedToSend] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const room = new ChatRoom({
       regionOrUrl: IVS_CHAT_REGION,
       tokenProvider: async () => {
@@ -66,11 +67,11 @@ export function ChatPanel({
           headers: { "Content-Type": "application/json" },
         });
         if (!res.ok) {
-          setConnectError(true);
+          if (!cancelled) setConnectError(true);
           throw new Error("Failed to fetch chat token");
         }
         const data = await res.json();
-        setCanSend(data.canSend);
+        if (!cancelled) setCanSend(data.canSend);
         return {
           token: data.token,
           sessionExpirationTime: new Date(data.sessionExpirationTime),
@@ -94,7 +95,7 @@ export function ChatPanel({
           username:
             (message.sender?.attributes?.displayName as string) ??
             (message.sender?.attributes?.username as string) ??
-            "unknown",
+            "Guest",
           message: message.content,
         },
       ]);
@@ -103,6 +104,7 @@ export function ChatPanel({
     room.connect();
 
     return () => {
+      cancelled = true;
       room.disconnect();
       roomRef.current = null;
     };
@@ -197,7 +199,7 @@ export function ChatPanel({
       <div className="flex shrink-0 flex-col gap-2 border-t border-zinc-800 p-3">
         {triedToSend && !canSend && (
           <a
-            href={`/auth?returnTo=${encodeURIComponent(pathname)}`}
+            href={`/auth?returnTo=${encodeURIComponent(pathname ?? "/")}`}
             className="text-[1.2rem] hover:underline"
           >
             You need to log in to send messages
