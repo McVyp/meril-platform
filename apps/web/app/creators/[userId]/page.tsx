@@ -6,6 +6,7 @@ import { UserProfile } from "@/types/stream";
 import { FollowButton } from "@/components/follow-button";
 import { useSession } from "@/context/SessionContext";
 import VideoPlayer from "@/components/video-player";
+import { recordView } from "@/lib/record-view";
 
 function RevealOnScroll({
   children,
@@ -143,7 +144,11 @@ export default function CreatorProfilePage() {
                   }`}
                 >
                   {video.hlsUrl ? (
-                    <VideoPlayer src={video.hlsUrl} title={video.title} />
+                    <VideoPlayer
+                      src={video.hlsUrl}
+                      title={video.title}
+                      onFirstPlay={() => recordView(video.id)}
+                    />
                   ) : video.thumbnailUrl ? (
                     <img
                       src={video.thumbnailUrl}

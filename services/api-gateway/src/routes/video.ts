@@ -8,8 +8,9 @@ import { z } from "zod";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { db } from "../lib/db";
 import { getTemporalClient } from "../lib/temporal";
-import { requireAuth } from "../middleware/auth";
+import { optionalAuth, requireAuth } from "../middleware/auth";
 import { requireDbUser } from "../middleware/requireDbUser";
+import { emitEvent } from "../lib/kafkaProducer";
 
 export const videoRouter = Router();
 
@@ -85,7 +86,8 @@ videoRouter.get("/", async (req, res) => {
 
     const videosWithUrls = await Promise.all(
       page.map(async (video) => {
-        if (!video.s3RawKey) return { ...video, playbackUrl: null };
+        if (!video.s3RawKey || video.hlsUrl)
+          return { ...video, playbackUrl: null };
         const playbackUrl = await getSignedUrl(
           s3,
           new GetObjectCommand({ Bucket: BUCKET, Key: video.s3RawKey }),
@@ -200,6 +202,52 @@ videoRouter.get("/:id/status", async (req, res) => {
   } catch (err) {
     console.error("GET /api/videos/:id/status error:", err);
     res.status(500).json({ error: "Failed to get video status" });
+  }
+});
+
+const KAFKA_TOPIC_VIEWED = process.env.KAFKA_TOPIC_VIEWED || "video.viewed";
+
+videoRouter.post("/:id/view", optionalAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+
+    const video = await db.video.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
+
+    if (!video) {
+      res.status(404).json({ error: "Video not found" });
+      return;
+    }
+
+    let viewerId: string | null = null;
+    if (req.auth?.sub) {
+      const dbUser = await db.user.findUnique({
+        where: { cognitoSub: req.auth.sub },
+        select: { id: true },
+      });
+      viewerId = dbUser?.id ?? null;
+    }
+
+    // skip counting the owner's own views
+    if (viewerId && viewerId === video.userId) {
+      res.status(202).json({ recorded: false, reason: "self-view" });
+      return;
+    }
+
+    await emitEvent(KAFKA_TOPIC_VIEWED, {
+      eventType: "video.viewed",
+      videoId: video.id,
+      creatorId: video.userId,
+      viewerId,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(202).json({ recorded: true });
+  } catch (err) {
+    console.error("POST /api/videos/:id/view error:", err);
+    res.status(202).json({ recorded: false });
   }
 });
 

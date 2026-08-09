@@ -38,7 +38,7 @@ export default function Home() {
         id: v.id,
         title: v.title.charAt(0).toUpperCase() + v.title.slice(1),
         description: v.description ?? "",
-        videoUrl: v.playbackUrl ?? v.hlsUrl!,
+        videoUrl: v.hlsUrl ?? v.playbackUrl!,
         hlsUrl: v.hlsUrl ?? null,
         type: "video" as const,
       }));
@@ -207,6 +207,7 @@ export default function Home() {
       sessionStorage.setItem(
         "watchItem",
         JSON.stringify({
+          id: item.id,
           title: item.title,
           playbackUrl: item.hlsUrl ?? item.videoUrl,
           description: item.description,

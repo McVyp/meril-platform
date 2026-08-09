@@ -8,6 +8,7 @@ interface VideoPlayerProps {
   title: string;
   isLive?: boolean;
   showLiveBadge?: boolean;
+  onFirstPlay?: () => void;
 }
 
 function SpeakerOnIcon() {
@@ -56,6 +57,7 @@ export default function VideoPlayer({
   title,
   isLive = false,
   showLiveBadge = true,
+  onFirstPlay,
 }: VideoPlayerProps) {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -67,6 +69,7 @@ export default function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [qualities, setQualities] = useState<
     { label: string; level: number }[]
   >([]);
@@ -98,16 +101,13 @@ export default function VideoPlayer({
           const orderedLevels = [...levels].reverse();
           setQualities([{ label: "Auto", level: -1 }, ...orderedLevels]);
 
-          const preferred = orderedLevels.find((l) => l.label === "720p");
-          if (preferred) {
-            hls.currentLevel = preferred.level;
-            setCurrentQuality(preferred.level);
-          } else {
-            setCurrentQuality(-1);
-          }
-
+          setCurrentQuality(-1);
+          setIsReady(true);
           if (isLive) {
             video.play().catch(() => {});
+            if (!hasStarted) {
+              onFirstPlay?.();
+            }
             setHasStarted(true);
           }
         });
@@ -121,6 +121,7 @@ export default function VideoPlayer({
       }
     } else {
       video.src = src;
+      setIsReady(true);
       return () => {
         video.pause();
         video.removeAttribute("src");
@@ -154,12 +155,15 @@ export default function VideoPlayer({
     if (v.paused) {
       v.play();
       setIsPlaying(true);
+      if (!hasStarted) {
+        onFirstPlay?.();
+      }
       setHasStarted(true);
     } else {
       v.pause();
       setIsPlaying(false);
     }
-  }, []);
+  }, [hasStarted, onFirstPlay]);
 
   const handleTimeUpdate = () => {
     const v = videoRef.current;
@@ -231,7 +235,6 @@ export default function VideoPlayer({
         muted={muted}
       />
 
-      {/* LIVE badge — top overlay, always visible while live and started */}
       {isLive && hasStarted && showLiveBadge && (
         <Badge
           variant="destructive"
@@ -241,7 +244,7 @@ export default function VideoPlayer({
         </Badge>
       )}
 
-      {!hasStarted && (
+      {isReady && !hasStarted && (
         <div
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center cursor-pointer group"

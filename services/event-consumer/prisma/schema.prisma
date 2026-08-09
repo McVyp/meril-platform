@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Video {
+  id           String      @id @default(cuid())
+  userId       String?
+  title        String
+  description  String?
+  status       VideoStatus @default(UPLOADING)
+  s3RawKey     String?
+  hlsUrl       String?
+  thumbnailUrl String?
+  duration     Int?
+  viewCount    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model View {
+  id        String   @id @default(cuid())
+  videoId   String
+  viewerId  String?
+  createdAt DateTime @default(now())
+
+  @@index([videoId])
+  @@index([viewerId])
+}
+
+enum VideoStatus {
+  UPLOADING
+  PROCESSING
+  TRANSCODING
+  READY
+  FAILED
+}

@@ -8,6 +8,7 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from src.activities.transcode import transcode_to_hls
+from src.activities.emit_failure_event import emit_transcode_failed
 from src.workflows.transcode_workflow import TranscodeWorkflow
 
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
@@ -26,7 +27,7 @@ async def main():
         client,
         task_queue=TASK_QUEUE,
         workflows=[TranscodeWorkflow],
-        activities=[transcode_to_hls]
+        activities=[transcode_to_hls, emit_transcode_failed]
     )
     print(f"Worker started on task queue: {TASK_QUEUE}")
     await worker.run()
