@@ -50,6 +50,16 @@ model Video {
   user User? @relation(fields: [userId], references: [id])
 }
 
+model View {
+  id        String   @id @default(cuid())
+  videoId   String
+  viewerId  String?
+  createdAt DateTime @default(now())
+
+  @@index([videoId])
+  @@index([viewerId])
+}
+
 model Stream {
   id          String       @id @default(cuid())
   userId      String
@@ -61,6 +71,8 @@ model Stream {
   endedAt     DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  ivsStageArn      String?
+  ivsCompositionId String?
 
   user User @relation(fields: [userId], references: [id])
 }

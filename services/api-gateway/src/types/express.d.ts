@@ -1,4 +1,4 @@
-import type { User } from "../generated/prisma/client";
+import type { User } from "@meril/db";
 
 declare global {
   namespace Express {

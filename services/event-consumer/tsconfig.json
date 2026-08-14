@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2025",
+    "target": "ES2024",
     "module": "CommonJS",
     "moduleResolution": "bundler",
     "outDir": "dist",

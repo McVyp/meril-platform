@@ -4,19 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "npx tsx watch src/index.ts",
-    "build": "prisma generate && tsc",
-    "start": "prisma migrate deploy && node dist/index.js",
+    "build": "tsc",
+    "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "pnpm --filter @meril/db studio"
   },
   "dependencies": {
+    "@meril/db": "workspace:*",
     "@aws-sdk/client-ivs": "^3.1075.0",
     "@aws-sdk/client-ivschat": "^3.1083.0",
     "@aws-sdk/client-s3": "^3.1073.0",
     "@aws-sdk/s3-request-presigner": "^3.1073.0",
     "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
     "@temporalio/client": "^1.18.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -35,7 +34,6 @@
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
-    "prisma": "^7.8.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
