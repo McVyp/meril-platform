@@ -2,6 +2,7 @@
   "name": "@meril/event-consumer",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "pnpm@11.5.2",
   "scripts": {
     "dev": "npx tsx watch src/index.ts",
     "build": "tsc",
