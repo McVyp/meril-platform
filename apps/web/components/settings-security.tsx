@@ -15,12 +15,15 @@ import {
   verifyTotpCode,
   getMfaStatus,
 } from "@/lib/auth/cognito-mfa";
+import { useSession } from "@/context/SessionContext";
 
 export function SecuritySection() {
+  const { email } = useSession();
+  const userLabel = email ?? "you";
   return (
     <div className="flex flex-col gap-6 p-1">
       <PasskeySection />
-      <TotpSection />
+      <TotpSection userLabel={userLabel} />
     </div>
   );
 }
@@ -164,7 +167,7 @@ function PasskeySection() {
   );
 }
 
-function TotpSection() {
+function TotpSection({ userLabel }: { userLabel: string }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<
@@ -220,7 +223,7 @@ function TotpSection() {
   }
 
   const otpauthUri = secret
-    ? `otpauth://totp/Meril:you?secret=${secret}&issuer=Meril`
+    ? `otpauth://totp/Meril:${encodeURIComponent(userLabel)}?secret=${secret}&issuer=Meril`
     : null;
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -257,9 +260,15 @@ function TotpSection() {
       )}
 
       {status === "not-enrolled" && (
-        <Button type="button" onClick={handleStart} className="w-full">
-          Set up authenticator app
-        </Button>
+        <div className="flex justify-center w-full mx-auto">
+          <Button
+            type="button"
+            onClick={handleStart}
+            className="w-1/2 cursor-pointer"
+          >
+            Set up authenticator app
+          </Button>
+        </div>
       )}
 
       {status === "enrolling" && !secret && (

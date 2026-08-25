@@ -4,7 +4,7 @@ packages:
   - "packages/*"
 
 allowBuilds:
-  '@prisma/engines': true
+  "@prisma/engines": true
   esbuild: true
   prisma: true
   sharp: true
@@ -19,4 +19,3 @@ onlyBuiltDependencies:
   - prisma
   - protobufjs
 verifyDepsBeforeRun: false
-

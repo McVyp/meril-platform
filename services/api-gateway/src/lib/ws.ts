@@ -38,8 +38,7 @@ export function setupWebSocket(server: Server) {
             username: msg.username ?? "Guest",
           });
         }
-      } catch {
-      }
+      } catch {}
     });
 
     ws.on("close", () => {

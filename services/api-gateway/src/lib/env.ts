@@ -1,2 +1,2 @@
-import { config } from 'dotenv'
-config({ path: '.env.local' })
+import { config } from "dotenv";
+config({ path: ".env.local" });

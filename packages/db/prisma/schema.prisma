@@ -23,6 +23,7 @@ model User {
   ivsPlaybackUrl    String?
   ivsStreamKey      String?
   ivsChatRoomArn    String?
+  ivsEncoderConfigArn String?
   cognitoSub        String?  @unique 
 
   socialLinks Json?
