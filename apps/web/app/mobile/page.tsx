@@ -13,7 +13,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { FlipHorizontal2, MessageCircle, SwitchCamera, Users, X } from "lucide-react";
+import {
+  FlipHorizontal2,
+  MessageCircle,
+  SwitchCamera,
+  Users,
+} from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { toast } from "sonner";
 
@@ -173,9 +178,6 @@ export default function MobileStudioPage() {
       if (!tokenRes.ok) throw new Error("Failed to get participant token");
       const tokenData = await tokenRes.json();
 
-      const payload = JSON.parse(atob(tokenData.token.split(".")[1]));
-      const whipUrl = payload.whip_url as string;
-
       const pc = new RTCPeerConnection();
       peerConnectionRef.current = pc;
       mediaStreamRef.current?.getTracks().forEach((track) => {
@@ -202,7 +204,6 @@ export default function MobileStudioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          whipUrl,
           token: tokenData.token,
           sdpOffer: pc.localDescription!.sdp,
         }),
@@ -270,7 +271,7 @@ export default function MobileStudioPage() {
         className={`absolute inset-0 h-full w-full object-cover transition-all duration-300 ${mirrored ? "scale-x-[-1]" : ""} ${switchingCamera ? "blur-md scale-110" : ""}`}
       />
       <div className="relative z-20 flex items-center justify-between p-4">
-        <Badge variant={isLive ? "destructive" : "secondary"} >
+        <Badge variant={isLive ? "destructive" : "secondary"}>
           {isLive ? "LIVE" : "PREVIEW"}
         </Badge>
 
