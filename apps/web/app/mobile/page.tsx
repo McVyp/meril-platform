@@ -13,8 +13,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Users } from "lucide-react";
+import { FlipHorizontal2, MessageCircle, SwitchCamera, Users, X } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { toast } from "sonner";
 
 type MobileState = "idle" | "requesting-camera" | "creating" | "live";
 
@@ -24,9 +25,11 @@ export default function MobileStudioPage() {
   const [description, setDescription] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState<number | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [mirrored, setMirrored] = useState<boolean>(true);
+  const [switchingCamera, setSwitchingCamera] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -35,28 +38,67 @@ export default function MobileStudioPage() {
 
   const [endedDialogOpen, setEndedDialogOpen] = useState(false);
 
-  const startPreview = useCallback(async () => {
-    setState("requesting-camera");
-    setError(null);
+  const startPreview = useCallback(
+    async (mode: "user" | "environment" = "user") => {
+      setState("requesting-camera");
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: mode },
+          audio: true,
+        });
+        mediaStreamRef.current = mediaStream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+        setState("idle");
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? `Camera/mic access failed: ${err.message}`
+            : `Camera/mic access failed`,
+        );
+        setState("idle");
+      }
+    },
+    [],
+  );
+
+  const flipCamera = useCallback(async () => {
+    if (switchingCamera) return;
+    setSwitchingCamera(true);
+    const nextMode = facingMode === "user" ? "environment" : "user";
+
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: nextMode },
         audio: true,
       });
-      mediaStreamRef.current = mediaStream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+      const oldStream = mediaStreamRef.current;
+      if (peerConnectionRef.current) {
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        const sender = peerConnectionRef.current
+          .getSenders()
+          .find((s) => s.track?.kind === "video");
+        if (sender && newVideoTrack) {
+          await sender.replaceTrack(newVideoTrack);
+        }
       }
-      setState("idle");
+      mediaStreamRef.current = newStream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+      }
+      setFacingMode(nextMode);
+      oldStream?.getTracks().forEach((track) => track.stop());
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? `Camera/mic access failed: ${err.message}`
           : `Camera/mic access failed`,
       );
-      setState("idle");
+    } finally {
+      setSwitchingCamera(false);
     }
-  }, []);
+  }, [facingMode, switchingCamera]);
 
   const handleMessage = useCallback((data: unknown) => {
     const msg = data as { type: string; count?: number };
@@ -110,7 +152,6 @@ export default function MobileStudioPage() {
     if (!title.trim() || !mediaStreamRef.current) return;
     if (goLiveInFlightRef.current) return;
     goLiveInFlightRef.current = true;
-    setError(null);
     setDialogOpen(false);
     setState("creating");
     let createdStreamId: string | null = null;
@@ -174,7 +215,7 @@ export default function MobileStudioPage() {
       setStreamId(stream.id);
       setState("live");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to go live");
+      toast.error(err instanceof Error ? err.message : "Failed to go live");
       setState("idle");
       peerConnectionRef.current?.close();
       peerConnectionRef.current = null;
@@ -209,12 +250,15 @@ export default function MobileStudioPage() {
       setTitle("");
       setDescription("");
       setViewerCount(null);
-      setError(null);
     }
   }, [streamId]);
 
   const canGoLive = !!title.trim() && !!mediaStreamRef.current;
   const isLive = state === "live";
+
+  const toggleMirror = useCallback(() => {
+    setMirrored((prev) => !prev);
+  }, []);
 
   return (
     <div className="relative flex h-dvh flex-col bg-[#0A0B0D] text-white">
@@ -223,13 +267,35 @@ export default function MobileStudioPage() {
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 h-full w-full object-cover"
+        className={`absolute inset-0 h-full w-full object-cover transition-all duration-300 ${mirrored ? "scale-x-[-1]" : ""} ${switchingCamera ? "blur-md scale-110" : ""}`}
       />
       <div className="relative z-20 flex items-center justify-between p-4">
-        <Badge variant={isLive ? "destructive" : "outline"}>
+        <Badge variant={isLive ? "destructive" : "secondary"} >
           {isLive ? "LIVE" : "PREVIEW"}
         </Badge>
+
         <div className="flex items-center gap-3">
+          <button
+            onClick={flipCamera}
+            disabled={switchingCamera}
+            className="rounded-full bg-black/40 p-2 backdrop-blur cursor-pointer disabled:opacity-40"
+            aria-label={
+              facingMode === "user"
+                ? "Switch to back camera"
+                : "Switch to front camera"
+            }
+          >
+            <SwitchCamera className="h-6 w-6" />
+          </button>
+          <button
+            onClick={toggleMirror}
+            className="rounded-full bg-black/40 p-2 backdrop-blur cursor-pointer"
+            aria-label={
+              mirrored ? "Turn off mirror effect" : "Turn on mirror effect"
+            }
+          >
+            <FlipHorizontal2 className="h-6 w-6" />
+          </button>
           {isLive && (
             <div className="flex items-center gap-3">
               <button onClick={() => setChatOpen((prev) => !prev)}>
@@ -253,10 +319,10 @@ export default function MobileStudioPage() {
           </Button>
         </div>
       </div>
-
       {isLive && chatOpen && streamId && (
         <MobileChatOverlay streamId={streamId} />
       )}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
