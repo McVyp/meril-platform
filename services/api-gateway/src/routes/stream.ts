@@ -566,7 +566,7 @@ streamRouter.post(
   "/webhook",
   async (req: Request<{}, {}, EventBridgeIvsEvent>, res: Response) => {
     if (
-      req.headers["x-webhook-secret"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
+      req.headers["x-api-key"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
     ) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -828,7 +828,7 @@ streamRouter.post(
   "/webhook-realtime",
   async (req: Request<{}, {}, any>, res: Response) => {
     if (
-      req.headers["x-webhook-secret"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
+      req.headers["x-api-key"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
     ) {
       res.status(401).json({ error: "Unauthorized" });
       return;
