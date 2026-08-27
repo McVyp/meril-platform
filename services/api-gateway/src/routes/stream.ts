@@ -735,6 +735,22 @@ streamRouter.post(
           data: { ivsEncoderConfigArn: encoderConfiguration.arn },
         });
       }
+
+      if (!user.ivsChatRoomArn) {
+        const chatRoom = await ivschat.send(
+          new CreateRoomCommand({ name: `meril-chat-${userId}` })
+        );
+        if (!chatRoom?.arn) {
+          res.status(500).json({ error: "IVS Chat Room creation returned no ARN" });
+          return;
+        }
+        user = await db.user.update({
+          where: { id: userId },
+          data: { ivsChatRoomArn: chatRoom.arn },
+        });
+      }
+
+
       await db.stream.updateMany({
         where: { userId, status: { in: ["OFFLINE", "LIVE"] } },
         data: { status: "ENDED", endedAt: new Date() },
@@ -828,7 +844,7 @@ streamRouter.post(
   "/webhook-realtime",
   async (req: Request<{}, {}, any>, res: Response) => {
     if (
-      req.headers["x-api-key"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
+      req.headers["x-webhook-secret"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
     ) {
       res.status(401).json({ error: "Unauthorized" });
       return;
