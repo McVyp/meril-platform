@@ -299,7 +299,10 @@ export default function MobileStudioPage() {
           </button>
           {isLive && (
             <div className="flex items-center gap-3">
-              <button onClick={() => setChatOpen((prev) => !prev)}>
+              <button
+                onClick={() => setChatOpen((prev) => !prev)}
+                className="rounded-full bg-black/40 p-2 backdrop-blur cursor-pointer"
+              >
                 <MessageCircle className="h-6 w-6" />
               </button>
               <div className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 font-mono text-white backdrop-blur">
