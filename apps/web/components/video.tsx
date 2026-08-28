@@ -154,7 +154,8 @@ export default function Video({
         muted
         playsInline
         preload="auto"
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+        style={{ objectFit: "cover" }}
+        className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${showSpinner? "opacity-0":
           isTransitioning ? "opacity-90" : "opacity-100"
         }`}
         onLoadedData={() => setShowSpinner(false)}
