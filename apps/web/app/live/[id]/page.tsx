@@ -99,7 +99,12 @@ export default function LivePage() {
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <div className="relative w-full aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0">
           {isLive && stream.playbackUrl ? (
-            <VideoPlayer src={stream.playbackUrl} title={stream.title} isLive />
+            <VideoPlayer
+              src={stream.playbackUrl}
+              title={stream.title}
+              isLive
+              showLiveBadge={false}
+            />
           ) : isLive ? (
             <div className="absolute inset-0 flex items-center justify-center text-white/20 text-[1.4rem]">
               Waiting for stream…
