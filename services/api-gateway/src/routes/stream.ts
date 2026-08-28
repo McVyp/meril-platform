@@ -711,6 +711,36 @@ streamRouter.post(
         }
       }
 
+      if (!user.ivsChannelArn){
+        const channelComand = new CreateChannelCommand({
+          name: `meril-${userId}`,
+          latencyMode: "LOW",
+          type: "STANDARD",
+        });
+
+        const {channel, streamKey} = await ivs.send(channelComand);
+
+        if (
+          !channel?.arn ||
+          !channel?.ingestEndpoint ||
+          !channel?.playbackUrl ||
+          !streamKey?.value
+        )
+        {
+          res.status(500).json({ error: "IVS Channel creation returned incomplete data" });
+          return;
+        }
+        user = await db.user.update({
+          where: { id: userId },
+          data: {
+            ivsChannelArn: channel.arn,
+            ivsIngestEndpoint: `rtmps://${channel.ingestEndpoint}:443/app/`,
+            ivsPlaybackUrl: channel.playbackUrl,
+            ivsStreamKey: streamKey.value,
+          },
+        });
+      }
+
       if (!user.ivsEncoderConfigArn) {
         const encoderCommand = new CreateEncoderConfigurationCommand({
           name: `meril-encoder-${userId}`,
