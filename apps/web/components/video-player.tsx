@@ -228,6 +228,8 @@ export default function VideoPlayer({
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
+        playsInline
+        webkit-playsinline="true"
         onTimeUpdate={handleTimeUpdate}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}

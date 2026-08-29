@@ -14,5 +14,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/studio", "/upload"],
+  matcher: ["/studio", "/upload", "/mobile"],
 };
