@@ -29,6 +29,8 @@ import {
   StopCompositionCommand,
 } from "@aws-sdk/client-ivs-realtime";
 import { ivsRealtime } from "../lib/ivs-realtime";
+import { dedupEventBridgeEvent } from "../middleware/dedupEventBridgeEvent";
+import { verifyEventBridgeAuth } from "../middleware/verifyEventBridgeAuth";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -564,13 +566,9 @@ streamRouter.put(
 // called by AWS EventBridge, not a logged-in browser — locking this down later means IAM/signature verification, not requireAuth.
 streamRouter.post(
   "/webhook",
+  verifyEventBridgeAuth,
+  dedupEventBridgeEvent,
   async (req: Request<{}, {}, EventBridgeIvsEvent>, res: Response) => {
-    if (
-      req.headers["x-api-key"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
-    ) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
     const event = req.body;
 
     try {
@@ -711,23 +709,24 @@ streamRouter.post(
         }
       }
 
-      if (!user.ivsChannelArn){
+      if (!user.ivsChannelArn) {
         const channelComand = new CreateChannelCommand({
           name: `meril-${userId}`,
           latencyMode: "LOW",
           type: "STANDARD",
         });
 
-        const {channel, streamKey} = await ivs.send(channelComand);
+        const { channel, streamKey } = await ivs.send(channelComand);
 
         if (
           !channel?.arn ||
           !channel?.ingestEndpoint ||
           !channel?.playbackUrl ||
           !streamKey?.value
-        )
-        {
-          res.status(500).json({ error: "IVS Channel creation returned incomplete data" });
+        ) {
+          res
+            .status(500)
+            .json({ error: "IVS Channel creation returned incomplete data" });
           return;
         }
         user = await db.user.update({
@@ -768,10 +767,12 @@ streamRouter.post(
 
       if (!user.ivsChatRoomArn) {
         const chatRoom = await ivschat.send(
-          new CreateRoomCommand({ name: `meril-chat-${userId}` })
+          new CreateRoomCommand({ name: `meril-chat-${userId}` }),
         );
         if (!chatRoom?.arn) {
-          res.status(500).json({ error: "IVS Chat Room creation returned no ARN" });
+          res
+            .status(500)
+            .json({ error: "IVS Chat Room creation returned no ARN" });
           return;
         }
         user = await db.user.update({
@@ -779,7 +780,6 @@ streamRouter.post(
           data: { ivsChatRoomArn: chatRoom.arn },
         });
       }
-
 
       await db.stream.updateMany({
         where: { userId, status: { in: ["OFFLINE", "LIVE"] } },
@@ -872,13 +872,9 @@ streamRouter.get(
 
 streamRouter.post(
   "/webhook-realtime",
+  verifyEventBridgeAuth,
+  dedupEventBridgeEvent,
   async (req: Request<{}, {}, any>, res: Response) => {
-    if (
-      req.headers["x-webhook-secret"] !== process.env.EVENTBRIDGE_WEBHOOK_SECRET
-    ) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
     const event = req.body;
     try {
       const detailType = event["detail-type"];
