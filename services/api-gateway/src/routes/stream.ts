@@ -31,6 +31,7 @@ import {
 import { ivsRealtime } from "../lib/ivs-realtime";
 import { dedupEventBridgeEvent } from "../middleware/dedupEventBridgeEvent";
 import { verifyEventBridgeAuth } from "../middleware/verifyEventBridgeAuth";
+import { rateLimit } from "../middleware/rateLimit";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -46,6 +47,11 @@ streamRouter.post(
   "/",
   requireAuth,
   requireDbUser,
+  rateLimit({
+    windowSeconds: 60,
+    maxRequests: 3,
+    keyPrefix: "desktop-stream",
+  }),
   async (req: Request<{}, {}, CreateStreamBody>, res: Response) => {
     const { title, description } = req.body;
     const userId = req.dbUser!.id;
@@ -437,6 +443,12 @@ streamRouter.patch(
 streamRouter.post(
   "/:id/chat-token",
   optionalAuth,
+  rateLimit({
+    windowSeconds: 60,
+    maxRequests: 3,
+    keyPrefix: "chat-token",
+    keyFn: (req) => req.ip ?? null,
+  }),
   async (req: Request<{ id: string }>, res: Response) => {
     const id = req.params.id;
 
@@ -675,6 +687,11 @@ streamRouter.post(
   "/mobile",
   requireAuth,
   requireDbUser,
+  rateLimit({
+    windowSeconds: 60,
+    maxRequests: 3,
+    keyPrefix: "mobile-stream",
+  }),
   async (req: Request<{}, {}, CreateStreamBody>, res: Response) => {
     const { title, description } = req.body;
     const userId = req.dbUser!.id;
@@ -824,6 +841,11 @@ streamRouter.get(
   "/:id/mobile-token",
   requireAuth,
   requireDbUser,
+  rateLimit({
+    windowSeconds: 60,
+    maxRequests: 3,
+    keyPrefix: "mobile-token",
+  }),
   async (req: Request<{ id: string }>, res: Response) => {
     const id = req.params.id;
 
