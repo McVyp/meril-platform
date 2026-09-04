@@ -155,8 +155,12 @@ export default function Video({
         playsInline
         preload="auto"
         style={{ objectFit: "cover" }}
-        className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${showSpinner? "opacity-0":
-          isTransitioning ? "opacity-90" : "opacity-100"
+        className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${
+          showSpinner
+            ? "opacity-0"
+            : isTransitioning
+              ? "opacity-90"
+              : "opacity-100"
         }`}
         onLoadedData={() => setShowSpinner(false)}
         onWaiting={() => setShowSpinner(true)}

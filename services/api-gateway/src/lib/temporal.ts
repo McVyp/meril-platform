@@ -7,14 +7,10 @@ export async function getTemporalClient(): Promise<Client> {
 
   const temporalHost = process.env.TEMPORAL_HOST ?? "localhost:7233";
   const temporalNamespace = process.env.TEMPORAL_NAMESPACE ?? "default";
-  const temporalApiKey = process.env.TEMPORAL_API_KEY;
 
   const connection = await Connection.connect({
     address: temporalHost,
-    tls: temporalApiKey ? true : false,
-    metadata: temporalApiKey
-      ? { authorization: `Bearer ${temporalApiKey}` }
-      : undefined,
+    tls: false,
   });
 
   client = new Client({

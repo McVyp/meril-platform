@@ -1,23 +1,25 @@
 # Meril
+
 Meril is a live streaming platform supporting both desktop (RTMP) and mobile (WHIP) broadcasting.
 
 ## Stack
-| Layer | Technology|
-|---|---|
-| Frontend | Next.js (Vercel)|
-| API | Express `api-gateway` |
-| Database | Postgres |
-| Cache /Idempotency | Redis|
-| Media (RTMP/WHIP Ingest, transcoding, playback) | AWS IVS |
-| Real-time / multi-participant | AWS IVS Real-Time (Stages, Compositions) |
-| Chat | AWS IVS Chat |
-| Event routing | AWS EventBridge |
-| Auth | AWS Cognito |
-| Storage / CDN | AWS S3 + CloudFront |
-| Workflow Orchestration | Temporal |
-| Background processing | `media-processor` worker |
-| Async events (view tracking, transcode completion) | Confluent Cloud (Kafka) |
-| Monorepo tooling | pnpm |
+
+| Layer                                              | Technology                               |
+| -------------------------------------------------- | ---------------------------------------- |
+| Frontend                                           | Next.js (Vercel)                         |
+| API                                                | Express `api-gateway`                    |
+| Database                                           | Postgres                                 |
+| Cache /Idempotency                                 | Redis                                    |
+| Media (RTMP/WHIP Ingest, transcoding, playback)    | AWS IVS                                  |
+| Real-time / multi-participant                      | AWS IVS Real-Time (Stages, Compositions) |
+| Chat                                               | AWS IVS Chat                             |
+| Event routing                                      | AWS EventBridge                          |
+| Auth                                               | AWS Cognito                              |
+| Storage / CDN                                      | AWS S3 + CloudFront                      |
+| Workflow Orchestration                             | Temporal                                 |
+| Background processing                              | `media-processor` worker                 |
+| Async events (view tracking, transcode completion) | Confluent Cloud (Kafka)                  |
+| Monorepo tooling                                   | pnpm                                     |
 
 ## High-level System Design
 
@@ -94,6 +96,7 @@ flowchart LR
 ```
 
 **Design notes:**
+
 - `verifyEventBridgeAuth` uses `crypto.timingSafeEqual` rather than a plain string comparison, avoiding timing-attack leakage on the shared secret.
 - The DLQ is a safety net, not the primary path - most events should never reach it. Its only job is to make otherwise-silent failures visible via the CloudWatch alarm.
 
@@ -109,13 +112,12 @@ flowchart LR
   RL -->|Redis error<br />fails open| Handler
 ```
 
-| Route | Window | Max requests | Key |
-|---|---|---|---|
-| `POST /api/streams/` (desktop go-live)| 60s | 3 | per user |
-| `POST /api/streams/mobile` (mobile go-live) | 60s | 3 | per user |
-| `GET /api/streams/:id/mobile-token` | 60s | 5 | per user |
-| `POST /api/streams/:id/chat-token` | 60s | 10 | per IP (guests have no user id) |
-
+| Route                                       | Window | Max requests | Key                             |
+| ------------------------------------------- | ------ | ------------ | ------------------------------- |
+| `POST /api/streams/` (desktop go-live)      | 60s    | 3            | per user                        |
+| `POST /api/streams/mobile` (mobile go-live) | 60s    | 3            | per user                        |
+| `GET /api/streams/:id/mobile-token`         | 60s    | 5            | per user                        |
+| `POST /api/streams/:id/chat-token`          | 60s    | 10           | per IP (guests have no user id) |
 
 ## Video upload & Transcode Pipeline
 
@@ -147,10 +149,10 @@ sequenceDiagram
     MP-->>T: activity result
 ```
 
-
 ## Local development
 
 1. Start infrastructure:
+
 ```bash
   docker compose -f infra/docker-compose.yml up postgres redis temporal temporal-ui -d
 ```
@@ -165,7 +167,7 @@ sequenceDiagram
 ```
 
 Once running:
+
 - Frontend: `http://localhost:3000`
 - API: `http://localhost:4000`
 - Temporal UI: `http://localhost:8080`
-
