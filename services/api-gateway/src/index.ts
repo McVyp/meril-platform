@@ -6,11 +6,12 @@ import helmet from "helmet";
 import { db } from "./lib/db";
 import { redis } from "./lib/redis";
 import { videoRouter } from "./routes/video";
-import { streamRouter } from "./routes/stream";
+import { streamRouter } from "./routes/streams";
 import { setupWebSocket } from "./lib/ws";
 import { authRouter } from "./routes/auth";
 import { followRouter } from "./routes/follows";
 import { usersRouter } from "./routes/users";
+import { startViewerCount } from "./lib/viewerCount";
 
 const app = express();
 
@@ -36,4 +37,7 @@ app.get("/health", async (_req, res) => {
 const PORT = process.env.PORT || 4000;
 const server = http.createServer(app);
 setupWebSocket(server);
-server.listen(PORT, () => console.log(`api-gateway running on :${PORT}`));
+server.listen(PORT, () => {
+  console.log(`api-gateway running on :${PORT}`);
+  startViewerCount();
+});
