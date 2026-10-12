@@ -13,6 +13,7 @@ def get_producer() -> Producer:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": os.environ["CONFLUENT_API_KEY"],
             "sasl.password": os.environ["CONFLUENT_API_SECRET"],
+            "enable.idempotence": True
         })
     return _producer
 
@@ -22,10 +23,11 @@ def _delivery_report(err, msg):
     else:
         print(f"Kafka event delivered to {msg.topic()} [{msg.partition()}]")
 
-async def emit_event(topic: str, payload: dict) -> None:
+async def emit_event(topic: str, payload: dict, key: str) -> None:
     producer = get_producer()
     producer.produce(
         topic,
+        key=key.encode("utf-8") if key else None,
         value=json.dumps(payload).encode("utf-8"),
         callback=_delivery_report,
     )

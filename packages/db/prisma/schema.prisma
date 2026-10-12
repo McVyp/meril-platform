@@ -53,6 +53,7 @@ model Video {
 
 model View {
   id        String   @id @default(cuid())
+  eventId   String?  @unique  
   videoId   String
   viewerId  String?
   createdAt DateTime @default(now())

@@ -14,7 +14,7 @@ const kafka = new Kafka({
   logLevel: logLevel.WARN,
 });
 
-const producer = kafka.producer();
+const producer = kafka.producer({ idempotent: true, maxInFlightRequests: 1 });
 let connected = false;
 
 async function ensureConnected() {
@@ -24,10 +24,14 @@ async function ensureConnected() {
   }
 }
 
-export async function emitEvent(topic: string, payload: object): Promise<void> {
+export async function emitEvent(
+  topic: string,
+  payload: object,
+  key?: string,
+): Promise<void> {
   await ensureConnected();
   await producer.send({
     topic,
-    messages: [{ value: JSON.stringify(payload) }],
+    messages: [{ key, value: JSON.stringify(payload) }],
   });
 }

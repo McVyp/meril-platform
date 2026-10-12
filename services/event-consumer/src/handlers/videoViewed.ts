@@ -1,7 +1,9 @@
 import { db } from "../lib/db";
+import { PermanentError } from "../lib/errors";
 
 interface VideoViewedEvent {
   eventType: "video.viewed";
+  eventId?: string;
   videoId: string;
   viewerId?: string | null;
   creatorId?: string | null;
@@ -13,27 +15,28 @@ export async function handleVideoViewed(raw: string) {
   try {
     event = JSON.parse(raw);
   } catch (err) {
-    console.error("Failed to parse video.viewed message:", err);
-    return;
+    throw new PermanentError("invalid JSON in video.viewed message");
   }
 
-  const { videoId, viewerId } = event;
+  const { videoId, viewerId, eventId } = event;
   if (!videoId) {
-    console.error("Malformed video.viewed event, missing videoId:", event);
+    console.error("Malformed video.viewed event, missing videoId");
     return;
   }
 
   try {
     await db.$transaction([
+      db.view.create({
+        data: { eventId: eventId ?? null, videoId, viewerId: viewerId ?? null},
+      }),
       db.video.update({
         where: { id: videoId },
         data: { viewCount: { increment: 1 } },
       }),
-      db.view.create({
-        data: { videoId, viewerId: viewerId ?? null },
-      }),
     ]);
-  } catch (err) {
-    console.error(`Failed to record view for ${videoId}:`, err);
+  } catch (err: any) {
+    if (err?.code === "P2022") return;
+    if (err?.code === "P2025") throw new PermanentError(`video ${videoId} not found`);
+    throw err;
   }
 }

@@ -179,8 +179,7 @@ videoRouter.get("/:id/status", async (req, res) => {
     const wfStatus = desc.status.name;
 
     if (wfStatus === "COMPLETED") {
-      const hlsKey = await handle.result();
-      const hlsUrl = `https://${process.env.CLOUDFRONT_DOMAIN}/${hlsKey}`;
+      const hlsUrl = await handle.result();
       await db.video.update({
         where: { id },
         data: { status: "READY", hlsUrl },
@@ -236,13 +235,18 @@ videoRouter.post("/:id/view", optionalAuth, async (req, res) => {
       return;
     }
 
-    await emitEvent(KAFKA_TOPIC_VIEWED, {
-      eventType: "video.viewed",
-      videoId: video.id,
-      creatorId: video.userId,
-      viewerId,
-      timestamp: new Date().toISOString(),
-    });
+    await emitEvent(
+      KAFKA_TOPIC_VIEWED,
+      {
+        eventType: "video.viewed",
+        eventId: crypto.randomUUID(),
+        videoId: video.id,
+        creatorId: video.userId,
+        viewerId,
+        timestamp: new Date().toISOString(),
+      },
+      video.id,
+    );
 
     res.status(202).json({ recorded: true });
   } catch (err) {

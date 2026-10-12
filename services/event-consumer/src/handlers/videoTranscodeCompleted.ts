@@ -1,4 +1,5 @@
 import { db } from "../lib/db";
+import { PermanentError } from "../lib/errors";
 
 interface TranscodeCompletedEvent {
   eventType: "video.transcode.completed";
@@ -14,26 +15,30 @@ export async function handleVideoTranscodeCompleted(raw: string) {
   try {
     event = JSON.parse(raw);
   } catch (err) {
-    console.error("Failed to parse video.transcode.completed message:", err);
-    return;
+    throw new PermanentError(
+      "invalid JSON in video.transcode.completed message",
+    );
   }
 
   const { videoId, status, hlsUrl } = event;
 
-  if (!videoId || !status) {
-    console.error("Malformed event, missing videoId or status:", event);
-    return;
+  if (!videoId || (status !== "READY" && status !== "FAILED")) {
+    throw new PermanentError(
+      "Malformed event, missing videoId or valid status:",
+    );
   }
 
-  try {
-    await db.video.update({
-      where: { id: videoId },
-      data: {
-        status,
-        ...(status === "READY" && { hlsUrl }),
-      },
-    });
-  } catch (err) {
-    console.error(`Failed to update video ${videoId}:`, err);
+  const result = await db.video.updateMany({
+    where: { id: videoId, status: { in: ["PROCESSING", "TRANSCODING"] } },
+    data: {
+      status,
+      ...(status === "READY" && { hlsUrl }),
+    },
+  });
+
+  if (result.count === 0) {
+    console.warn(
+      `transcode event for ${videoId} ignored (already final or not found)`,
+    );
   }
 }

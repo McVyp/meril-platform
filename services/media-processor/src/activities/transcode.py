@@ -25,8 +25,7 @@ async def transcode_to_hls(video_key: str) -> str:
     # video_key is "raw/{videoId}/{fileName}" — the real DB id is the
     # path segment, not the filename (filename was previously used by
     # mistake and doesn't match the actual Video row's id).
-    real_video_id = video_key.split("/")[1]
-    video_id = os.path.splitext(os.path.basename(video_key))[0]
+    video_id = video_key.split("/")[1]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, "input.mp4")
@@ -60,15 +59,7 @@ async def transcode_to_hls(video_key: str) -> str:
     hls_url = f"https://{CLOUDFRONT_DOMAIN}/{master_key}"
     activity.logger.info(f"Done. Master playlist: s3://{S3_HLS_BUCKET}/{master_key}")
 
-    await emit_event(KAFKA_TOPIC_TRANSCODE, {
-        "eventType": "video.transcode.completed",
-        "videoId": real_video_id,
-        "status": "READY",
-        "hlsUrl": hls_url,
-    })
-
-    return master_key
-
+    return hls_url;
 
 def _run_ffmpeg(input_path: str, output_dir: str, video_id: str) -> None:
     """Multi-bitrate HLS transcode - 3 renditions: 1080p, 720p, 360p"""
