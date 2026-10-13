@@ -11,6 +11,8 @@ import { getTemporalClient } from "../lib/temporal";
 import { optionalAuth, requireAuth } from "../middleware/auth";
 import { requireDbUser } from "../middleware/requireDbUser";
 import { emitEvent } from "../lib/kafkaProducer";
+import { rateLimit } from "../middleware/rateLimit";
+import { redis } from "../lib/redis";
 
 export const videoRouter = Router();
 
@@ -206,54 +208,75 @@ videoRouter.get("/:id/status", async (req, res) => {
 
 const KAFKA_TOPIC_VIEWED = process.env.KAFKA_TOPIC_VIEWED || "video.viewed";
 
-videoRouter.post("/:id/view", optionalAuth, async (req, res) => {
-  try {
-    const id = req.params.id as string;
+videoRouter.post(
+  "/:id/view",
+  rateLimit({ windowSeconds: 60, maxRequests: 60, keyPrefix: "view" }),
+  optionalAuth,
+  async (req, res) => {
+    try {
+      const id = req.params.id as string;
 
-    const video = await db.video.findUnique({
-      where: { id },
-      select: { id: true, userId: true },
-    });
-
-    if (!video) {
-      res.status(404).json({ error: "Video not found" });
-      return;
-    }
-
-    let viewerId: string | null = null;
-    if (req.auth?.sub) {
-      const dbUser = await db.user.findUnique({
-        where: { cognitoSub: req.auth.sub },
-        select: { id: true },
+      const video = await db.video.findUnique({
+        where: { id },
+        select: { id: true, userId: true },
       });
-      viewerId = dbUser?.id ?? null;
+
+      if (!video) {
+        res.status(404).json({ error: "Video not found" });
+        return;
+      }
+
+      let viewerId: string | null = null;
+      if (req.auth?.sub) {
+        const dbUser = await db.user.findUnique({
+          where: { cognitoSub: req.auth.sub },
+          select: { id: true },
+        });
+        viewerId = dbUser?.id ?? null;
+      }
+
+      // skip counting the owner's own views
+      if (viewerId && viewerId === video.userId) {
+        res.status(202).json({ recorded: false, reason: "self-view" });
+        return;
+      }
+      const viewerKey = viewerId ?? req.ip ?? "unknown";
+      try {
+        const fresh = await redis.set(
+          `video:dedup:${video.id}:${viewerKey}`,
+          "1",
+          "EX",
+          30,
+          "NX",
+        );
+        if (fresh !== "OK") {
+          res.status(202).json({ recorded: false, reason: "duplicate-view" });
+          return;
+        }
+      } catch (err) {
+        console.error("view dedup failed, counting anyway", err);
+      }
+
+      await emitEvent(
+        KAFKA_TOPIC_VIEWED,
+        {
+          eventType: "video.viewed",
+          eventId: crypto.randomUUID(),
+          videoId: video.id,
+          creatorId: video.userId,
+          viewerId,
+          timestamp: new Date().toISOString(),
+        },
+        video.id,
+      );
+
+      res.status(202).json({ recorded: true });
+    } catch (err) {
+      console.error("POST /api/videos/:id/view error:", err);
+      res.status(202).json({ recorded: false });
     }
-
-    // skip counting the owner's own views
-    if (viewerId && viewerId === video.userId) {
-      res.status(202).json({ recorded: false, reason: "self-view" });
-      return;
-    }
-
-    await emitEvent(
-      KAFKA_TOPIC_VIEWED,
-      {
-        eventType: "video.viewed",
-        eventId: crypto.randomUUID(),
-        videoId: video.id,
-        creatorId: video.userId,
-        viewerId,
-        timestamp: new Date().toISOString(),
-      },
-      video.id,
-    );
-
-    res.status(202).json({ recorded: true });
-  } catch (err) {
-    console.error("POST /api/videos/:id/view error:", err);
-    res.status(202).json({ recorded: false });
-  }
-});
+  },
+);
 
 // videoId comes from the same uuid generated in POST /upload-url
 videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
