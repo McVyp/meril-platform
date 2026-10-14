@@ -15,6 +15,12 @@ interface ProxyOptions {
   requireAuth?: boolean;
   useIdToken?: boolean;
   clientKey?: string | null;
+  clientCountry?: string | null;
+}
+
+export function getClientCountry(req: NextRequest): string | null {
+  const c = req.headers.get("x-vercel-ip-country")?.trim() || null;
+  return c && /^[A-Z]{2}$/.test(c) ? c : null;
 }
 
 export function getClientIp(req: NextRequest): string | null {
@@ -28,6 +34,7 @@ export async function proxyToGateway(path: string, opts: ProxyOptions = {}) {
     requireAuth = true,
     useIdToken = false,
     clientKey,
+    clientCountry,
   } = opts;
 
   const { accessToken, idToken } = await getSessionTokens();
@@ -45,6 +52,7 @@ export async function proxyToGateway(path: string, opts: ProxyOptions = {}) {
   if (clientKey && proxySecret) {
     headers["x-client-ip"] = clientKey;
     headers["x-proxy-secret"] = proxySecret;
+    if (clientCountry) headers["x-client-country"] = clientCountry;
   }
 
   try {

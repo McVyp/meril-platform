@@ -10,6 +10,7 @@ interface VideoInteractionEvent {
   watchedDuration: number;
   duration: number;
   occurredAt: string;
+  country?: string | null;
 }
 
 export async function handleVideoInteraction(raw: string) {
@@ -28,6 +29,7 @@ export async function handleVideoInteraction(raw: string) {
     watchedDuration,
     duration,
     occurredAt,
+    country,
   } = event;
 
   if (!eventId || !videoId || (!userId && !sessionId)) {
@@ -50,6 +52,9 @@ export async function handleVideoInteraction(raw: string) {
     throw new PermanentError("video.interaction has invalid occurredAt");
   }
 
+  const safeCountry =
+    typeof country === "string" && /^[A-Z]{2}$/.test(country) ? country : null;
+
   try {
     await db.interaction.create({
       data: {
@@ -60,6 +65,7 @@ export async function handleVideoInteraction(raw: string) {
         watchedDuration: Math.round(watchedDuration),
         duration: Math.round(duration),
         occurredAt: at,
+        country: safeCountry,
       },
     });
   } catch (err: any) {

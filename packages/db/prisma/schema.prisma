@@ -68,6 +68,7 @@ model Interaction {
   userId          String?
   sessionId       String?
   videoId         String
+  country         String?
   watchedDuration Int
   duration        Int
   occurredAt       DateTime
