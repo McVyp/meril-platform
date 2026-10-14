@@ -238,6 +238,9 @@ export default function Home() {
       {currentItem?.videoUrl && (
         <Video
           videoUrl={currentItem.videoUrl}
+          videoId={
+            currentItem.type === "video" ? String(currentItem.id) : undefined
+          }
           nextVideoUrl={nextItem?.videoUrl ?? undefined}
           isTransitioning={isTransitioning}
           isLoaded={true}

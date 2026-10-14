@@ -1,11 +1,13 @@
 "use client";
 import { useRef, useState, useEffect, useCallback } from "react";
+import { useVideoInteraction } from "@/hooks/useVideoInteraction";
 import Hls from "hls.js";
 import { Badge } from "./ui/badge";
 
 interface VideoPlayerProps {
   src: string;
   title: string;
+  videoId?: string;
   isLive?: boolean;
   showLiveBadge?: boolean;
   onFirstPlay?: () => void;
@@ -55,6 +57,7 @@ function SpeakerMutedIcon() {
 export default function VideoPlayer({
   src,
   title,
+  videoId,
   isLive = false,
   showLiveBadge = true,
   onFirstPlay,
@@ -74,6 +77,8 @@ export default function VideoPlayer({
     { label: string; level: number }[]
   >([]);
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
+
+  const tracking = useVideoInteraction(videoId, isLive);
 
   // HLS setup
   useEffect(() => {
@@ -168,6 +173,7 @@ export default function VideoPlayer({
   const handleTimeUpdate = () => {
     const v = videoRef.current;
     if (!v || isLive) return;
+    tracking.onTimeUpdate(v);
     const pct = (v.currentTime / v.duration) * 100;
     if (progressBarRef.current) {
       progressBarRef.current.style.width = `${pct}%`;
@@ -231,6 +237,7 @@ export default function VideoPlayer({
         playsInline
         webkit-playsinline="true"
         onTimeUpdate={handleTimeUpdate}
+        onSeeking={tracking.onSeeking}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onClick={togglePlay}

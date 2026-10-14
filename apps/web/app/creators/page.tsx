@@ -37,7 +37,7 @@ export default function CreatorsPage() {
       .map((c) => ({
         id: c.id,
         username: c.username,
-        title: c.name ?? "Unnamed",
+        title: c.name || c.username || "Unnamed",
         description: "",
         videoUrl: c.bannerUrl ?? c.latestVideoUrl,
         type: "creator" as const,
@@ -47,7 +47,7 @@ export default function CreatorsPage() {
     creators.map((c) => ({
       id: c.id,
       username: c.username,
-      title: c.name ?? "Unnamed",
+      title: c.name || c.username || "Unnamed",
       description: "",
       videoUrl: c.bannerUrl ?? c.latestVideoUrl ?? null,
       type: "creator" as const,

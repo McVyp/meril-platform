@@ -55,6 +55,7 @@ export default function WatchPage() {
               <VideoPlayer
                 src={item.playbackUrl}
                 title={item.title}
+                videoId={item.id || undefined}
                 onFirstPlay={() => item.id && recordView(item.id)}
               />
             )}

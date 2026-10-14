@@ -18,4 +18,6 @@ const kafka = new Kafka({
   logLevel: logLevel.WARN,
 });
 
-export const consumer = kafka.consumer({ groupId: "event-consumer-group-v2" });
+export const consumer = kafka.consumer({
+  groupId: process.env.KAFKA_GROUP_ID || "event-consumer-group-v2",
+});

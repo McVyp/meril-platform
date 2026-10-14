@@ -100,7 +100,7 @@ export default function CreatorProfilePage() {
       <div className="px-8 sm:px-16 pt-16 pb-10 flex items-center justify-center gap-4">
         <div>
           <h1 className="text-white text-[3rem] sm:text-[4rem] font-semibold leading-none tracking-tight">
-            {profile.user.name ?? "Unnamed"}
+            {profile.user.name ?? profile.user.username ?? "Unnamed"}
           </h1>
           <div className="flex items-center justify-center gap-4 mt-3 text-white/40 text-[1.2rem]">
             <span>{profile.followerCount.toLocaleString()} followers</span>
@@ -147,6 +147,7 @@ export default function CreatorProfilePage() {
                     <VideoPlayer
                       src={video.hlsUrl}
                       title={video.title}
+                      videoId={video.id}
                       onFirstPlay={() => recordView(video.id)}
                     />
                   ) : video.thumbnailUrl ? (

@@ -13,6 +13,7 @@ import { requireDbUser } from "../middleware/requireDbUser";
 import { emitEvent } from "../lib/kafkaProducer";
 import { rateLimit } from "../middleware/rateLimit";
 import { redis } from "../lib/redis";
+import { clientKey } from "../lib/clientIp";
 
 export const videoRouter = Router();
 
@@ -240,7 +241,7 @@ videoRouter.post(
         res.status(202).json({ recorded: false, reason: "self-view" });
         return;
       }
-      const viewerKey = viewerId ?? req.ip ?? "unknown";
+      const viewerKey = viewerId ?? clientKey(req);
       try {
         const fresh = await redis.set(
           `video:dedup:${video.id}:${viewerKey}`,

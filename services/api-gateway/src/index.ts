@@ -9,6 +9,7 @@ import { videoRouter } from "./routes/video";
 import { streamRouter } from "./routes/streams";
 import { setupWebSocket } from "./lib/ws";
 import { authRouter } from "./routes/auth";
+import { interactionsRouter } from "./routes/interactions";
 import { followRouter } from "./routes/follows";
 import { usersRouter } from "./routes/users";
 import { startViewerCount } from "./lib/viewerCount";
@@ -24,6 +25,7 @@ app.use("/api/videos", videoRouter);
 app.use("/api/streams", streamRouter);
 app.use("/api", followRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/interactions", interactionsRouter);
 
 app.get("/health", async (_req, res) => {
   try {

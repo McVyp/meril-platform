@@ -62,6 +62,22 @@ model View {
   @@index([viewerId])
 }
 
+model Interaction {
+  id              String  @id @default(cuid())
+  eventId         String  @unique
+  userId          String?
+  sessionId       String?
+  videoId         String
+  watchedDuration Int
+  duration        Int
+  occurredAt       DateTime
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, occurredAt])
+  @@index([sessionId, occurredAt])
+  @@index([videoId, occurredAt])
+}
+
 model Stream {
   id          String       @id @default(cuid())
   userId      String

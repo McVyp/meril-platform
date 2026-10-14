@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { redis } from "../lib/redis";
+import { clientKey } from "../lib/clientIp";
 
 interface RateLimitOptions {
   windowSeconds: number;
@@ -12,7 +13,8 @@ export function rateLimit(options: RateLimitOptions) {
   const { windowSeconds, maxRequests, keyPrefix, keyFn } = options;
 
   return async (req: Request, res: Response, next: NextFunction) => {
-    const identifier = keyFn?.(req) ?? req.dbUser?.id ?? req.ip ?? "unknown";
+    const identifier =
+      keyFn?.(req) ?? req.dbUser?.id ?? clientKey(req) ?? "unknown";
 
     const key = `ratelimit:${keyPrefix}:${identifier}`;
 

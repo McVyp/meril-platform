@@ -27,7 +27,7 @@ export async function handleVideoViewed(raw: string) {
   try {
     await db.$transaction([
       db.view.create({
-        data: { eventId: eventId ?? null, videoId, viewerId: viewerId ?? null},
+        data: { eventId: eventId ?? null, videoId, viewerId: viewerId ?? null },
       }),
       db.video.update({
         where: { id: videoId },
@@ -36,7 +36,8 @@ export async function handleVideoViewed(raw: string) {
     ]);
   } catch (err: any) {
     if (err?.code === "P2022") return;
-    if (err?.code === "P2025") throw new PermanentError(`video ${videoId} not found`);
+    if (err?.code === "P2025")
+      throw new PermanentError(`video ${videoId} not found`);
     throw err;
   }
 }

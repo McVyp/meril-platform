@@ -1,9 +1,11 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import Hls from "hls.js";
+import { useVideoInteraction } from "@/hooks/useVideoInteraction";
 
 interface VideoProps {
   videoUrl: string;
+  videoId?: string;
   nextVideoUrl?: string;
   isTransitioning: boolean;
   isLoaded: boolean;
@@ -13,6 +15,7 @@ interface VideoProps {
 
 export default function Video({
   videoUrl,
+  videoId,
   nextVideoUrl,
   isTransitioning,
   isLoaded,
@@ -26,6 +29,8 @@ export default function Video({
   const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
   const preloadHlsRef = useRef<Hls | null>(null);
   const preloadedUrlRef = useRef<string | null>(null);
+
+  const tracking = useVideoInteraction(videoId, isLive);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -154,6 +159,8 @@ export default function Video({
         muted
         playsInline
         preload="auto"
+        onTimeUpdate={(e) => tracking.onTimeUpdate(e.currentTarget)}
+        onSeeking={tracking.onSeeking}
         style={{ objectFit: "cover" }}
         className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${
           showSpinner

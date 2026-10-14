@@ -4,15 +4,18 @@ import { handleVideoTranscodeCompleted } from "./handlers/videoTranscodeComplete
 import { handleVideoViewed } from "./handlers/videoViewed";
 import { PermanentError } from "./lib/errors";
 import { sendToDLQ } from "./lib/dlq";
+import { handleVideoInteraction } from "./handlers/videoInteraction";
 
 const TOPIC_TRANSCODE = process.env.KAFKA_TOPIC_TRANSCODE!;
 const TOPIC_VIEWED = process.env.KAFKA_TOPIC_VIEWED!;
+const TOPIC_INTERACTIONS = process.env.KAFKA_TOPIC_INTERACTIONS!;
 
 const MAX_ATTEMPTS = 5;
 
 const handlers: Record<string, (raw: string) => Promise<void>> = {
   [TOPIC_TRANSCODE]: handleVideoTranscodeCompleted,
   [TOPIC_VIEWED]: handleVideoViewed,
+  [TOPIC_INTERACTIONS]: handleVideoInteraction,
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -21,6 +24,7 @@ async function main() {
   await consumer.connect();
   await consumer.subscribe({ topic: TOPIC_TRANSCODE, fromBeginning: false });
   await consumer.subscribe({ topic: TOPIC_VIEWED, fromBeginning: false });
+  await consumer.subscribe({ topic: TOPIC_INTERACTIONS, fromBeginning: false });
 
   await consumer.run({
     eachMessage: async ({ topic, message, partition, heartbeat }) => {
@@ -30,24 +34,34 @@ async function main() {
       const handler = handlers[topic];
       if (!handler) return;
 
-      for(let attempt = 1; ;attempt++){
+      for (let attempt = 1; ; attempt++) {
         try {
           await handler(value);
           return;
-        }
-        catch(err){
+        } catch (err) {
           const permanent = err instanceof PermanentError;
           if (permanent || attempt >= MAX_ATTEMPTS) {
-            console.error(`[${topic}] sending offet ${message.offset} to DLQ after ${attempt} attempt(s):`, err);
-            await sendToDLQ(topic, partition, message.offset, message.key, value, err);
+            console.error(
+              `[${topic}] sending offet ${message.offset} to DLQ after ${attempt} attempt(s):`,
+              err,
+            );
+            await sendToDLQ(
+              topic,
+              partition,
+              message.offset,
+              message.key,
+              value,
+              err,
+            );
             return;
           }
-          console.warn(`[${topic}] attempt ${attempt} failed, will retry:`, err);
+          console.warn(
+            `[${topic}] attempt ${attempt} failed, will retry:`,
+            err,
+          );
           await sleep(Math.min(500 * 2 ** (attempt - 1), 8000));
           await heartbeat();
-
         }
-
       }
     },
   });

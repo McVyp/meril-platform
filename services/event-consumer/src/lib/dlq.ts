@@ -21,10 +21,9 @@ export const sendToDLQ = async (
         partition: attr(String(partition)),
         offset: attr(offset),
         ...(key && { key: attr(key.toString()) }),
-        error: attr((err instanceof Error ? err.message : String(err)).slice(
-          0,
-          1000,
-        )),
+        error: attr(
+          (err instanceof Error ? err.message : String(err)).slice(0, 1000),
+        ),
         failedAt: attr(new Date().toISOString()),
       },
     }),

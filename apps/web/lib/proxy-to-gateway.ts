@@ -1,3 +1,4 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSessionTokens } from "@/lib/auth/session";
 
@@ -13,10 +14,21 @@ interface ProxyOptions {
   body?: BodyInit;
   requireAuth?: boolean;
   useIdToken?: boolean;
+  clientKey?: string | null;
+}
+
+export function getClientIp(req: NextRequest): string | null {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 }
 
 export async function proxyToGateway(path: string, opts: ProxyOptions = {}) {
-  const { method = "GET", body, requireAuth = true, useIdToken = false } = opts;
+  const {
+    method = "GET",
+    body,
+    requireAuth = true,
+    useIdToken = false,
+    clientKey,
+  } = opts;
 
   const { accessToken, idToken } = await getSessionTokens();
   const token = useIdToken ? idToken : accessToken;
@@ -28,6 +40,12 @@ export async function proxyToGateway(path: string, opts: ProxyOptions = {}) {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers["Content-Type"] = "application/json";
+
+  const proxySecret = process.env.GATEWAY_PROXY_SECRET;
+  if (clientKey && proxySecret) {
+    headers["x-client-ip"] = clientKey;
+    headers["x-proxy-secret"] = proxySecret;
+  }
 
   try {
     const res = await fetch(`${API_URL}${path}`, {
