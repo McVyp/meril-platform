@@ -336,7 +336,7 @@ videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
     try {
       const temporal = await getTemporalClient();
       await temporal.workflow.start("TranscodeWorkflow", {
-        args: [s3Key],
+        args: [s3Key, title, description ?? null],
         taskQueue: "media-processor",
         workflowId: `transcode-${video.id}`,
       });

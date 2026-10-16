@@ -10,7 +10,9 @@ S3_RAW_BUCKET = os.environ.get("S3_RAW_BUCKET", "meril-raw")
 S3_HLS_BUCKET = os.environ.get("S3_HLS_BUCKET", "meril-hls")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
 CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN")
-KAFKA_TOPIC_TRANSCODE = os.environ.get("KAFKA_TOPIC_TRANSCODE", "video.transcode.completed")
+KAFKA_TOPIC_TRANSCODE = os.environ.get(
+    "KAFKA_TOPIC_TRANSCODE", "video.transcode.completed"
+)
 
 
 @activity.defn
@@ -47,7 +49,9 @@ async def transcode_to_hls(video_key: str) -> str:
             for file in files:
                 local_path = os.path.join(root, file)
                 s3_key = f"hls/{video_id}/{file}"
-                content_type = "application/x-mpegURL" if file.endswith(".m3u8") else "video/MP2T"
+                content_type = (
+                    "application/x-mpegURL" if file.endswith(".m3u8") else "video/MP2T"
+                )
                 await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda lp=local_path, sk=s3_key, ct=content_type: s3.upload_file(
@@ -59,7 +63,8 @@ async def transcode_to_hls(video_key: str) -> str:
     hls_url = f"https://{CLOUDFRONT_DOMAIN}/{master_key}"
     activity.logger.info(f"Done. Master playlist: s3://{S3_HLS_BUCKET}/{master_key}")
 
-    return hls_url;
+    return hls_url
+
 
 def _run_ffmpeg(input_path: str, output_dir: str, video_id: str) -> None:
     """Multi-bitrate HLS transcode - 3 renditions: 1080p, 720p, 360p"""
@@ -78,8 +83,7 @@ def _run_ffmpeg(input_path: str, output_dir: str, video_id: str) -> None:
         segment_pattern = os.path.join(output_dir, f"{r['name']}_%03d.ts")
 
         (
-            ffmpeg
-            .input(input_path)
+            ffmpeg.input(input_path)
             .output(
                 playlist_path,
                 vf=f"scale=-2:{r['height']}",
@@ -96,7 +100,9 @@ def _run_ffmpeg(input_path: str, output_dir: str, video_id: str) -> None:
 
         bandwidth = int(r["bitrate"].replace("k", "")) * 1000
         width = {1080: 1920, 720: 1280, 360: 640}[r["height"]]
-        variant_lines.append(f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},RESOLUTION={width}x{r["height"]}')
+        variant_lines.append(
+            f"#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},RESOLUTION={width}x{r['height']}"
+        )
         variant_lines.append(f"{r['name']}.m3u8")
 
     with open(master_playlist, "w") as f:

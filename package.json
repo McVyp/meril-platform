@@ -5,7 +5,8 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "format": "prettier --write ."
+    "format": "prettier --write . && pnpm format:py",
+    "format:py": "uvx ruff format ."
   },
   "devDependencies": {
     "prettier": "^3.9.6",

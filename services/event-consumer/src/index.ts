@@ -2,13 +2,16 @@ import "dotenv/config";
 import { consumer } from "./kafka/consumer";
 import { handleVideoTranscodeCompleted } from "./handlers/videoTranscodeCompleted";
 import { handleVideoViewed } from "./handlers/videoViewed";
+
 import { PermanentError } from "./lib/errors";
 import { sendToDLQ } from "./lib/dlq";
 import { handleVideoInteraction } from "./handlers/videoInteraction";
+import { handleVideoEmbeddingComputed } from "./handlers/videoEmbeddingComputed";
 
 const TOPIC_TRANSCODE = process.env.KAFKA_TOPIC_TRANSCODE!;
 const TOPIC_VIEWED = process.env.KAFKA_TOPIC_VIEWED!;
 const TOPIC_INTERACTIONS = process.env.KAFKA_TOPIC_INTERACTIONS!;
+const TOPIC_EMBEDDINGS = process.env.KAFKA_TOPIC_EMBEDDINGS!;
 
 const MAX_ATTEMPTS = 5;
 
@@ -16,6 +19,7 @@ const handlers: Record<string, (raw: string) => Promise<void>> = {
   [TOPIC_TRANSCODE]: handleVideoTranscodeCompleted,
   [TOPIC_VIEWED]: handleVideoViewed,
   [TOPIC_INTERACTIONS]: handleVideoInteraction,
+  [TOPIC_EMBEDDINGS]: handleVideoEmbeddingComputed,
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -25,6 +29,7 @@ async function main() {
   await consumer.subscribe({ topic: TOPIC_TRANSCODE, fromBeginning: false });
   await consumer.subscribe({ topic: TOPIC_VIEWED, fromBeginning: false });
   await consumer.subscribe({ topic: TOPIC_INTERACTIONS, fromBeginning: false });
+  await consumer.subscribe({ topic: TOPIC_EMBEDDINGS, fromBeginning: false });
 
   await consumer.run({
     eachMessage: async ({ topic, message, partition, heartbeat }) => {
