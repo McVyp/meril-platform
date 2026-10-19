@@ -14,6 +14,10 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev --no-install-project
 
+ENV FASTEMBED_CACHE_PATH=/app/.fastembed_cache
+ARG EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+RUN uv run --no-sync python -c "from fastembed import TextEmbedding; TextEmbedding('${EMBEDDING_MODEL}')"
+
 COPY . .
 
 CMD ["uv", "run", "python", "-m", "src.worker"]
