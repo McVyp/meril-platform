@@ -15,6 +15,7 @@ from src.activities.emit_failure_event import (
     emit_embedding_computed,
 )
 from src.workflows.transcode_workflow import TranscodeWorkflow
+from src.workflows.embed_video_workflow import EmbedVideoWorkflow
 
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 TEMPORAL_NAMESPACE = os.environ.get("TEMPORAL_NAMESPACE", "default")
@@ -41,7 +42,7 @@ async def main():
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[TranscodeWorkflow],
+        workflows=[TranscodeWorkflow, EmbedVideoWorkflow],
         activities=[
             transcode_to_hls,
             emit_transcode_completed,
