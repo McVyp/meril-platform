@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Upload, X, Film } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -16,6 +17,7 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -121,7 +123,13 @@ export default function UploadPage() {
       const createRes = await fetch("/api/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoId, title, description, s3Key }),
+        body: JSON.stringify({
+          videoId,
+          title,
+          description,
+          s3Key,
+          isAiGenerated,
+        }),
       });
 
       if (!createRes.ok)
@@ -135,6 +143,7 @@ export default function UploadPage() {
       });
       setTitle("");
       setDescription("");
+      setIsAiGenerated(false);
       setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success("Upload complete");
@@ -167,6 +176,21 @@ export default function UploadPage() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Give your video a title"
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-0 focus-visible:border-white/30 h-[2rem]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label
+                htmlFor="isAiGenerated"
+                className="text-white/70 text-[1.5rem]"
+              >
+                AI Generated
+              </Label>
+              <Checkbox
+                id="isAiGenerated"
+                checked={isAiGenerated}
+                onCheckedChange={(v) => setIsAiGenerated(v === true)}
+                disabled={isUploading}
+                className="h-[1.5rem] w-[1.5rem] border-white/30 data-[state=checked]:bg-white data-[state=unchecked]:text-black cursor-pointer"
               />
             </div>
 

@@ -5,6 +5,7 @@ export interface VideoData {
   videoUrl: string | null;
   hlsUrl: string | null;
   type: "video" | "live";
+  isAiGenerated: boolean;
 }
 
 export interface ApiVideo {
@@ -13,6 +14,7 @@ export interface ApiVideo {
   description: string | null;
   playbackUrl: string | null;
   hlsUrl: string | null;
+  isAiGenerated?: boolean;
 }
 
 export interface ApiStream {

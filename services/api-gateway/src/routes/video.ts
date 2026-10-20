@@ -55,6 +55,7 @@ videoRouter.get("/search", async (req, res) => {
         duration: true,
         viewCount: true,
         userId: true,
+        isAiGenerated: true,
       },
     });
 
@@ -283,10 +284,11 @@ videoRouter.post(
 videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
   try {
     const schema = z.object({
-      videoId: z.string().uuid(),
+      videoId: z.uuid(),
       title: z.string(),
       description: z.string().optional(),
       s3Key: z.string(),
+      isAiGenerated: z.boolean().optional().default(false),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -295,7 +297,7 @@ videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
       return;
     }
 
-    const { videoId, title, description, s3Key } = parsed.data;
+    const { videoId, title, description, s3Key, isAiGenerated } = parsed.data;
     const userId = req.dbUser!.id;
 
     const existing = await db.video.findUnique({ where: { id: videoId } });
@@ -318,6 +320,7 @@ videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
           s3RawKey: s3Key,
           status: "PROCESSING",
           userId,
+          isAiGenerated,
         },
       });
     } catch (err: any) {

@@ -78,6 +78,7 @@ usersRouter.get(
           duration: true,
           viewCount: true,
           createdAt: true,
+          isAiGenerated: true,
         },
       });
 

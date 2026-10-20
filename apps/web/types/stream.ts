@@ -50,5 +50,6 @@ export interface UserProfile {
     title: string;
     thumbnailUrl: string | null;
     hlsUrl: string | null;
+    isAiGenerated: boolean;
   }[];
 }

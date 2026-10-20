@@ -41,6 +41,7 @@ export default function Home() {
         videoUrl: v.hlsUrl ?? v.playbackUrl!,
         hlsUrl: v.hlsUrl ?? null,
         type: "video" as const,
+        isAiGenerated: v.isAiGenerated ?? false,
       }));
 
   const mapSearchResults = (videos: ApiVideo[]): VideoData[] =>
@@ -51,6 +52,7 @@ export default function Home() {
       videoUrl: v.playbackUrl ?? v.hlsUrl ?? null,
       hlsUrl: v.hlsUrl ?? null,
       type: "video" as const,
+      isAiGenerated: v.isAiGenerated ?? false,
     }));
 
   const fetchMoreVideos = useCallback(() => {
@@ -167,6 +169,7 @@ export default function Home() {
                 videoUrl: s.playbackUrl,
                 hlsUrl: s.playbackUrl,
                 type: "live" as const,
+                isAiGenerated: false,
               }));
             setItems((prev) => {
               const withoutStaleLive = prev.filter(
@@ -312,6 +315,7 @@ export default function Home() {
             allTitles={displayedItems.map((i) => i.title)}
             itemIds={displayedItems.map((i) => i.id)}
             liveFlags={displayedItems.map((i) => i.type === "live")}
+            aiFlags={displayedItems.map((i) => i.isAiGenerated)}
             onSelect={handleTitleClick}
           />
         )}

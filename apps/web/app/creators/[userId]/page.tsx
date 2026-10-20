@@ -7,6 +7,7 @@ import { FollowButton } from "@/components/follow-button";
 import { useSession } from "@/context/SessionContext";
 import VideoPlayer from "@/components/video-player";
 import { recordView } from "@/lib/record-view";
+import { Badge } from "@/components/ui/badge";
 
 function RevealOnScroll({
   children,
@@ -135,6 +136,15 @@ export default function CreatorProfilePage() {
                 >
                   <span className="text-white/70 text-[1.4rem] font-medium">
                     {video.title}
+                    {video.isAiGenerated && (
+                      <Badge
+                        variant="outline"
+                        title="AI Generated"
+                        className="ml-2 align-middle border-white/30 text-white/60"
+                      >
+                        AI
+                      </Badge>
+                    )}
                   </span>
                 </div>
 
