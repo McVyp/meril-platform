@@ -47,6 +47,8 @@ model Video {
   viewCount     Int         @default(0)
   embedding     Unsupported("vector(384)")?
   embeddingHash String?
+  isAiGenerated Boolean     @default(false)
+  topic         String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
