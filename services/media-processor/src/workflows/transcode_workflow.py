@@ -11,6 +11,7 @@ with workflow.unsafe.imports_passed_through():
         emit_transcode_completed,
         emit_embedding_computed,
     )
+    from src.activities.provenance import check_provenance
 
 EMIT_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=2),
@@ -25,6 +26,16 @@ class TranscodeWorkflow:
     async def run(
         self, video_key: str, title: str | None = None, description: str | None = None
     ) -> str:
+        provenance = None
+        try:
+            provenance = await workflow.execute_activity(
+                check_provenance,
+                video_key,
+                start_to_close_timeout=timedelta(minutes=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except ActivityError as e:
+            workflow.logger.warning(f"Provenance check failed for {video_key}: {e}")
         try:
             hls_url = await workflow.execute_activity(
                 transcode_to_hls,
@@ -44,7 +55,7 @@ class TranscodeWorkflow:
 
         await workflow.execute_activity(
             emit_transcode_completed,
-            args=[video_key, hls_url],
+            args=[video_key, hls_url, provenance],
             start_to_close_timeout=timedelta(seconds=30),
             schedule_to_close_timeout=timedelta(days=1),
             retry_policy=EMIT_RETRY,

@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from temporalio import activity
 from src.kafka.producer import emit_event
 
@@ -13,18 +14,20 @@ def _video_id(video_key: str) -> str:
 
 
 @activity.defn
-async def emit_transcode_completed(video_key: str, hls_url: str) -> None:
+async def emit_transcode_completed(
+    video_key: str, hls_url: str, provenance: dict | None = None
+) -> None:
     video_id = _video_id(video_key)
-    await emit_event(
-        KAFKA_TOPIC_TRANSCODE,
-        {
-            "eventType": "video.transcode.completed",
-            "videoId": video_id,
-            "status": "READY",
-            "hlsUrl": hls_url,
-        },
-        key=video_id,
-    )
+    payload: dict[str, Any] = {
+        "eventType": "video.transcode.completed",
+        "videoId": video_id,
+        "status": "READY",
+        "hlsUrl": hls_url,
+    }
+    # C2PA result from check_provenacne; omitted if the check failed or didn't run
+    if provenance is not None:
+        payload["provenance"] = provenance
+    await emit_event(KAFKA_TOPIC_TRANSCODE, payload, key=video_id)
 
 
 @activity.defn

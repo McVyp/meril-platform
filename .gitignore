@@ -40,3 +40,5 @@ venv/
 *.env.docker
 
 start.sh
+seed/videos/
+seed/videos.json

@@ -8,6 +8,11 @@ interface TranscodeCompletedEvent {
   status: "READY" | "FAILED";
   hlsUrl: string | null;
   errorMessage?: string | null;
+  provenance?: {
+    hasManifest: boolean;
+    aiGenerated: boolean;
+    generator: string | null;
+  };
 }
 
 export async function handleVideoTranscodeCompleted(raw: string) {
@@ -20,7 +25,7 @@ export async function handleVideoTranscodeCompleted(raw: string) {
     );
   }
 
-  const { videoId, status, hlsUrl } = event;
+  const { videoId, status, hlsUrl, provenance } = event;
 
   if (!videoId || (status !== "READY" && status !== "FAILED")) {
     throw new PermanentError(
@@ -35,6 +40,16 @@ export async function handleVideoTranscodeCompleted(raw: string) {
       ...(status === "READY" && { hlsUrl }),
     },
   });
+
+  if (provenance) {
+    await db.video.updateMany({
+      where: { id: videoId },
+      data: {
+        provenance,
+        ...(provenance.aiGenerated && { isAiGenerated: true }),
+      },
+    });
+  }
 
   if (result.count === 0) {
     console.warn(

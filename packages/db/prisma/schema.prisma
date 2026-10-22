@@ -49,6 +49,7 @@ model Video {
   embeddingHash String?
   isAiGenerated Boolean     @default(false)
   topic         String?
+  provenance    Json?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
