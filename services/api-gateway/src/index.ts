@@ -19,7 +19,7 @@ app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
-app.use(express.json());
+app.use(express.json({ inflate: false }));
 app.use("/api/auth", authRouter);
 app.use("/api/videos", videoRouter);
 app.use("/api/streams", streamRouter);

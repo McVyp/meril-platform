@@ -42,3 +42,5 @@ venv/
 start.sh
 seed/videos/
 seed/videos.json
+
+.fastembed_cache/
