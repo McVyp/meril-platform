@@ -58,6 +58,14 @@ func (s *Server) GetRecommendations(ctx context.Context, req *recommenderv1.GetR
 	}
 	exclude := recommend.Exclude{VideoIDs: watchedIDs, OwnerID: req.GetUserId()}
 
+	if req.GetUserId() != "" {
+		followed, err := s.engine.FromFollowed(ctx, req.GetUserId(), max(1, limit/4), exclude)
+		if err != nil {
+			log.Printf("from followed: %v", err)
+		} else {
+			add(followed, recommenderv1.Source_SOURCE_FOLLOWING)
+		}
+	}
 	if taste != nil {
 		near, err := s.engine.Nearest(ctx, taste, limit, exclude)
 		if err != nil {
