@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Badge } from "./ui/badge";
 
 interface TitleProps {
@@ -19,14 +20,31 @@ export default function Title({
   aiFlags,
   onSelect,
 }: TitleProps) {
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const item = itemRefs.current[currentIndex];
+    if (!list || !item) return;
+    list.scrollTo({
+      top: item.offsetTop - list.clientHeight / 2 + item.clientHeight / 2,
+      behavior: "smooth",
+    });
+  }, [currentIndex]);
   return (
-    <div className="text-white max-w-4xl">
+    <div
+      ref={listRef}
+      className="text-white max-w-4xl max-h-[75vh] overflow-hidden relative [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)]"
+    >
       {allTitles.map((titleItem, index) => {
         const isActive = index === currentIndex;
         const isLive = liveFlags?.[index] ?? false;
         const isAi = aiFlags?.[index] ?? false;
         return (
           <div
+            ref={(el) => {
+              itemRefs.current[index] = el;
+            }}
             key={itemIds[index]}
             onClick={() => onSelect(index)}
             className={`transition-all duration-300 select-none cursor-pointer ${
