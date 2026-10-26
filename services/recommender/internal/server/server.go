@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -6,9 +6,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	recommenderv1 "github.com/mcvyp/meril-platform/services/recommender/gen/meril/recommender/v1"
+	"github.com/mcvyp/meril-platform/services/recommender/internal/recommend"
 )
 
 const (
@@ -16,12 +15,16 @@ const (
 	maxLimit     = 100
 )
 
-type server struct {
+type Server struct {
 	recommenderv1.UnimplementedRecommenderServiceServer
-	db *pgxpool.Pool
+	engine *recommend.Engine
 }
 
-func (s *server) GetRecommendations(ctx context.Context, req *recommenderv1.GetRecommendationsRequest) (*recommenderv1.GetRecommendationsResponse, error) {
+func New(engine *recommend.Engine) *Server {
+	return &Server{engine: engine}
+}
+
+func (s *Server) GetRecommendations(ctx context.Context, req *recommenderv1.GetRecommendationsRequest) (*recommenderv1.GetRecommendationsResponse, error) {
 	limit := int(req.GetLimit())
 	if limit <= 0 {
 		limit = defaultLimit
@@ -29,7 +32,7 @@ func (s *server) GetRecommendations(ctx context.Context, req *recommenderv1.GetR
 		limit = maxLimit
 	}
 
-	videos, err := s.trending(ctx, limit)
+	videos, err := s.engine.Trending(ctx, limit)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "trending: %v", err)
 	}

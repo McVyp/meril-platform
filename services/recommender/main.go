@@ -12,9 +12,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvec "github.com/pgvector/pgvector-go/pgx"
 
 	recommenderv1 "github.com/mcvyp/meril-platform/services/recommender/gen/meril/recommender/v1"
+	"github.com/mcvyp/meril-platform/services/recommender/internal/recommend"
+	"github.com/mcvyp/meril-platform/services/recommender/internal/server"
 )
 
 func main() {
@@ -30,7 +34,15 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := pgxpool.New(ctx, dbURL)
+	config, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		log.Fatalf("parse DATABASE_URL: %v", err)
+	}
+	// teach every connection about pgvector's vector type registration
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvec.RegisterTypes(ctx, conn)
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		log.Fatalf("create pool: %v", err)
 	}
@@ -49,7 +61,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	recommenderv1.RegisterRecommenderServiceServer(grpcServer, &server{db: pool})
+	recommenderv1.RegisterRecommenderServiceServer(grpcServer, server.New(recommend.New(pool)))
 	reflection.Register(grpcServer)
 
 	go func() {

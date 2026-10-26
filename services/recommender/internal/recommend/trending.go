@@ -1,15 +1,10 @@
-package main
+package recommend
 
 import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
 )
-
-type scoredVideo struct {
-	ID    string
-	Score float64
-}
 
 const trendingQuery = `
 	SELECT v.id, COUNT(i.id)::float8 AS score
@@ -23,11 +18,11 @@ const trendingQuery = `
 	LIMIT $1
 `
 
-func (s *server) trending(ctx context.Context, limit int) ([]scoredVideo, error) {
+func (s *Engine) Trending(ctx context.Context, limit int) ([]ScoredVideo, error) {
 	rows, err := s.db.Query(ctx, trendingQuery, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	return pgx.CollectRows(rows, pgx.RowToStructByPos[scoredVideo])
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[ScoredVideo])
 }
