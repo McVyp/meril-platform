@@ -9,6 +9,7 @@ import (
 )
 
 type watchedVideo struct {
+	ID           string
 	Embedding    pgvector.Vector
 	MaxWatched   int
 	TotalWatched int
@@ -16,7 +17,7 @@ type watchedVideo struct {
 }
 
 const tasteQuery = `
-	SELECT v.embedding,
+	SELECT v.id, v.embedding,
 		max(i."watchedDuration") AS max_watched,
 		sum(i."watchedDuration") AS total_watched,
 		max(i.duration) AS duration
@@ -51,24 +52,27 @@ func watchWeight(maxWatched, totalWatched, duration int) float32 {
 }
 
 // TasteVector computes the taste vector for a user or session based on watched videos.
-func (e *Engine) TasteVector(ctx context.Context, userID, sessionID string) ([]float32, int, error) {
+func (e *Engine) TasteVector(ctx context.Context, userID, sessionID string) ([]float32, []string, error) {
 	if userID == "" && sessionID == "" {
-		return nil, 0, nil
+		return nil, nil, nil
 	}
 
 	rows, err := e.db.Query(ctx, tasteQuery, userID, sessionID)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
 	watched, err := pgx.CollectRows(rows, pgx.RowToStructByPos[watchedVideo])
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
+
+	ids := make([]string, 0, len(watched))
 
 	var taste []float32
 	hasPositive := false
 	for _, w := range watched {
+		ids = append(ids, w.ID)
 		emb := w.Embedding.Slice()
 		if taste == nil {
 			taste = make([]float32, len(emb))
@@ -82,9 +86,9 @@ func (e *Engine) TasteVector(ctx context.Context, userID, sessionID string) ([]f
 		}
 	}
 	if !hasPositive || !normalize(taste) {
-		return nil, len(watched), nil
+		return nil, ids, nil
 	}
-	return taste, len(watched), nil
+	return taste, ids, nil
 }
 
 // normalize scales v to length 1; false if v is all zeros or too close to zero

@@ -12,13 +12,15 @@ const nearestQuery = `
 	SELECT id, 1 - (embedding <=> $1) AS score
 	FROM "Video" 
 	WHERE status = 'READY' AND embedding IS NOT NULL
+		AND id <> ALL(COALESCE($3::text[], '{}'))
+		AND ($4::text = '' OR "userId" IS DISTINCT FROM $4)
 	ORDER BY embedding <=> $1
 	LIMIT $2
 `
 
 // nearest returns the vidoes most similart to taste; score is cosine similarity (1 = identical)
-func (e *Engine) Nearest(ctx context.Context, taste []float32, limit int) ([]ScoredVideo, error) {
-	rows, err := e.db.Query(ctx, nearestQuery, pgvector.NewVector(taste), limit)
+func (e *Engine) Nearest(ctx context.Context, taste []float32, limit int, ex Exclude) ([]ScoredVideo, error) {
+	rows, err := e.db.Query(ctx, nearestQuery, pgvector.NewVector(taste), limit, ex.VideoIDs, ex.OwnerID)
 	if err != nil {
 		return nil, err
 	}

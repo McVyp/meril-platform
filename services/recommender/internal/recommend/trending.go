@@ -15,13 +15,15 @@ const trendingQuery = `
 		AND i."occurredAt" > now() - interval '7 days'
 		AND i."watchedDuration" >= 3
 	WHERE v.status = 'READY'
+		AND v.id <> ALL(COALESCE($2::text[], '{}'))
+		AND ($3::text = '' OR v."userId" IS DISTINCT FROM $3)
 	GROUP BY v.id
 	ORDER BY score DESC, v."viewCount" DESC, v."createdAt" DESC
 	LIMIT $1
 `
 
-func (s *Engine) Trending(ctx context.Context, limit int) ([]ScoredVideo, error) {
-	rows, err := s.db.Query(ctx, trendingQuery, limit)
+func (s *Engine) Trending(ctx context.Context, limit int, ex Exclude) ([]ScoredVideo, error) {
+	rows, err := s.db.Query(ctx, trendingQuery, limit, ex.VideoIDs, ex.OwnerID)
 	if err != nil {
 		return nil, err
 	}

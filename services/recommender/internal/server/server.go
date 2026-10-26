@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	defaultLimit = 20
-	maxLimit     = 100
+	defaultLimit  = 20
+	maxLimit      = 100
+	minTasteScore = 0.2
 )
 
 type Server struct {
@@ -48,33 +49,45 @@ func (s *Server) GetRecommendations(ctx context.Context, req *recommenderv1.GetR
 			})
 		}
 	}
-	
+
 	// personalized: videos similar to user's taste
-	taste, _, err := s.engine.TasteVector(ctx, req.GetUserId(), req.GetSessionId())
+	taste, watchedIDs, err := s.engine.TasteVector(ctx, req.GetUserId(), req.GetSessionId())
 
 	if err != nil {
 		log.Printf("taste vector: %v", err)
 	}
+	exclude := recommend.Exclude{VideoIDs: watchedIDs, OwnerID: req.GetUserId()}
+
 	if taste != nil {
-		near, err := s.engine.Nearest(ctx, taste, limit)
+		near, err := s.engine.Nearest(ctx, taste, limit, exclude)
 		if err != nil {
 			log.Printf("nearest: %v", err)
 		} else {
-			add(near, recommenderv1.Source_SOURCE_TASTE)
+			matches := make([]recommend.ScoredVideo, 0, len(near))
+			for _, v := range near {
+				if v.Score >= minTasteScore {
+					matches = append(matches, v)
+				}
+			}
+			add(matches, recommenderv1.Source_SOURCE_TASTE)
 		}
 	}
 
 	// fill remaining slots with trending videos. Error only if no recommendations are available at all
-	if len(resp.Items) < limit {
-		trending, err := s.engine.Trending(ctx, limit+len(resp.Items))
-		if err != nil {
-			if len(resp.Items) == 0 {
-				return nil, status.Errorf(codes.Internal, "trending: %v", err)
-			}
-			log.Printf("trending: %v", err)
-		} else {
-			add(trending, recommenderv1.Source_SOURCE_TRENDING)
+
+	for _, ex := range []recommend.Exclude{exclude, {OwnerID: req.GetUserId()}} {
+		if len(resp.Items) >= limit {
+			break
 		}
+		trending, err := s.engine.Trending(ctx, limit+len(resp.Items), ex)
+		if err != nil {
+			log.Printf("trending: %v", err)
+			continue
+		}
+		add(trending, recommenderv1.Source_SOURCE_TRENDING)
+	}
+	if len(resp.Items) == 0 {
+		return nil, status.Errorf(codes.NotFound, "no recommendations available")
 	}
 	return resp, nil
 }

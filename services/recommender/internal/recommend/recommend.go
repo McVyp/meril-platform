@@ -15,3 +15,8 @@ type ScoredVideo struct {
 	ID    string
 	Score float64
 }
+
+type Exclude struct {
+	VideoIDs []string
+	OwnerID  string
+}
