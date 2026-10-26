@@ -5,7 +5,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "format": "prettier --write . && pnpm format:py",
+    "format": "prettier --write . && pnpm format:py && pnpm format:go && pnpm format:proto",
     "format:py": "uvx ruff format .",
     "format:go": "gofmt -w services/recommender",
     "format:proto": "buf format -w"
