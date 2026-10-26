@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package meril.recommender.v1;
+
+option go_package = "github.com/mcvyp/meril-platform/services/recommender/gen/meril/recommender/v1;recommenderv1";
+
+service RecommenderService {
+  rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse);
+}
+
+message GetRecommendationsRequest {
+  string user_id = 1;
+  string session_id = 2;
+  int32 limit = 3;
+}
+
+message GetRecommendationsResponse {
+  repeated Recommendation items = 1;
+}
+
+message Recommendation {
+  string video_id = 1;
+  double score = 2;
+  Source source = 3;
+}
+
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  SOURCE_TASTE = 1;
+  SOURCE_SESSION = 2;
+  SOURCE_TRENDING = 3;
+  SOURCE_FOLLOWING = 4;
+}
