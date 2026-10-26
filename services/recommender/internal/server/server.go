@@ -15,6 +15,7 @@ const (
 	defaultLimit  = 20
 	maxLimit      = 100
 	minTasteScore = 0.2
+	sessionBlend  = 0.5
 )
 
 type Server struct {
@@ -58,6 +59,22 @@ func (s *Server) GetRecommendations(ctx context.Context, req *recommenderv1.GetR
 	}
 	exclude := recommend.Exclude{VideoIDs: watchedIDs, OwnerID: req.GetUserId()}
 
+	recent := s.engine.RecentViews(ctx, req.GetUserId(), req.GetSessionId())
+	for _, v := range recent {
+		exclude.VideoIDs = append(exclude.VideoIDs, v.VideoID)
+	}
+
+	sessionVec, err := s.engine.SessionVector(ctx, recent)
+	if err != nil {
+		log.Printf("session vector: %v", err)
+	}
+
+	tasteSource := recommenderv1.Source_SOURCE_TASTE
+	if taste == nil && sessionVec != nil {
+		tasteSource = recommenderv1.Source_SOURCE_SESSION
+	}
+	taste = recommend.Blend(taste, sessionVec, sessionBlend)
+
 	if req.GetUserId() != "" {
 		followed, err := s.engine.FromFollowed(ctx, req.GetUserId(), max(1, limit/4), exclude)
 		if err != nil {
@@ -77,12 +94,11 @@ func (s *Server) GetRecommendations(ctx context.Context, req *recommenderv1.GetR
 					matches = append(matches, v)
 				}
 			}
-			add(matches, recommenderv1.Source_SOURCE_TASTE)
+			add(matches, tasteSource)
 		}
 	}
 
 	// fill remaining slots with trending videos. Error only if no recommendations are available at all
-
 	for _, ex := range []recommend.Exclude{exclude, {OwnerID: req.GetUserId()}} {
 		if len(resp.Items) >= limit {
 			break

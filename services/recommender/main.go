@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgxvec "github.com/pgvector/pgvector-go/pgx"
+	"github.com/redis/go-redis/v9"
 
 	recommenderv1 "github.com/mcvyp/meril-platform/services/recommender/gen/meril/recommender/v1"
 	"github.com/mcvyp/meril-platform/services/recommender/internal/recommend"
@@ -55,13 +56,25 @@ func main() {
 		log.Fatalf("connect to postgres: %v", err)
 	}
 
+	var rdb *redis.Client
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		opt, err := redis.ParseURL(redisURL)
+		if err != nil {
+			log.Fatalf("parse REDIS_URL: %v", err)
+		}
+		rdb = redis.NewClient(opt)
+		defer rdb.Close()
+	} else {
+		log.Println("REDIS_URL is not set, skipping Redis client initialization")
+	}
+
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
 	grpcServer := grpc.NewServer()
-	recommenderv1.RegisterRecommenderServiceServer(grpcServer, server.New(recommend.New(pool)))
+	recommenderv1.RegisterRecommenderServiceServer(grpcServer, server.New(recommend.New(pool, rdb)))
 	reflection.Register(grpcServer)
 
 	go func() {

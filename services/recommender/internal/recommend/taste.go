@@ -24,7 +24,7 @@ const tasteQuery = `
 	FROM "Interaction" i
 	JOIN "Video" v ON v.id = i."videoId"
 	WHERE v.embedding IS NOT NULL
-		AND CASE WHEN $1::text <> '' THEN i."userId" = $1 ELSE i."sessionId" = $2 END
+		AND (i."userId" = NULLIF($1::text, '') OR i."sessionId" = NULLIF($2::text, ''))
 		AND i."occurredAt" > now() - interval '90 days'
 	GROUP BY v.id
 	ORDER BY max(i."occurredAt") DESC
