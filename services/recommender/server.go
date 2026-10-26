@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	recommenderv1 "github.com/mcvyp/meril-platform/services/recommender/gen/meril/recommender/v1"
@@ -30,27 +29,17 @@ func (s *server) GetRecommendations(ctx context.Context, req *recommenderv1.GetR
 		limit = maxLimit
 	}
 
-	rows, err := s.db.Query(ctx, `
-		SELECT id::text
-		FROM "Video"
-		WHERE status = 'READY'
-		ORDER BY "createdAt" DESC
-		LIMIT $1
-	`, limit)
+	videos, err := s.trending(ctx, limit)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "query videos: %v", err)
-	}
-
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "read videos: %v", err)
+		return nil, status.Errorf(codes.Internal, "trending: %v", err)
 	}
 
 	resp := &recommenderv1.GetRecommendationsResponse{}
-	for _, id := range ids {
+	for _, v := range videos {
 		resp.Items = append(resp.Items, &recommenderv1.Recommendation{
-			VideoId: id,
-			Source:  recommenderv1.Source_SOURCE_UNSPECIFIED,
+			VideoId: v.ID,
+			Score:   v.Score,
+			Source:  recommenderv1.Source_SOURCE_TRENDING,
 		})
 	}
 	return resp, nil
