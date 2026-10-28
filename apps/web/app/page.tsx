@@ -11,19 +11,20 @@ import UserMenu from "@/components/userMenu";
 import { PublicStream } from "@/types/stream";
 import { SearchBar, SearchStatus } from "@/components/searchBar";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { getSessionId } from "@/lib/interactions";
 
 export default function Home() {
   const router = useRouter();
+  const nextCursorRef = useRef<string | null>(null);
+  const isFetchingMoreRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const recommendedLoadedRef = useRef(false);
+
   const lastShownItemRef = useRef<VideoData | null>(null);
   const [items, setItems] = useState<VideoData[]>([]);
   const currentIdRef = useRef<string | number | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
-
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const nextCursorRef = useRef<string | null>(null);
-  const isFetchingMoreRef = useRef(false);
-  const hasMoreRef = useRef(true);
-
   const [searchActive, setSearchActive] = useState(false);
   const [searchResults, setSearchResults] = useState<VideoData[] | null>(null);
 
@@ -59,9 +60,12 @@ export default function Home() {
     if (isFetchingMoreRef.current || !hasMoreRef.current) return;
     isFetchingMoreRef.current = true;
 
-    const url = nextCursorRef.current
-      ? `/api/videos?cursor=${encodeURIComponent(nextCursorRef.current)}`
-      : "/api/videos";
+    const firstPage = !recommendedLoadedRef.current;
+    const url = firstPage
+      ? `/api/videos/recommended?sessionId=${encodeURIComponent(getSessionId())}`
+      : nextCursorRef.current
+        ? `/api/videos?cursor=${encodeURIComponent(nextCursorRef.current)}`
+        : "/api/videos";
 
     fetch(url)
       .then((r) => {
@@ -69,8 +73,12 @@ export default function Home() {
         return r.json();
       })
       .then((data: { videos: ApiVideo[]; nextCursor: string | null }) => {
-        nextCursorRef.current = data.nextCursor;
-        hasMoreRef.current = data.nextCursor !== null;
+        if (firstPage) {
+          recommendedLoadedRef.current = true;
+        } else {
+          nextCursorRef.current = data.nextCursor ?? null;
+          hasMoreRef.current = data.nextCursor !== null;
+        }
 
         const dbVideos = mapApiVideos(data.videos);
         if (dbVideos.length === 0) return;
@@ -78,7 +86,9 @@ export default function Home() {
         setItems((prev) => {
           const live = prev.filter((i) => i.type === "live");
           const existingDb = prev.filter((i) => i.type === "video");
-          return [...live, ...existingDb, ...dbVideos];
+          const shown = new Set(existingDb.map((i) => i.id));
+          const fresh = dbVideos.filter((i) => !shown.has(i.id));
+          return [...live, ...existingDb, ...fresh];
         });
       })
       .catch((err) => {
