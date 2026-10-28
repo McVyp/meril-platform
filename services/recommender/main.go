@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/jackc/pgx/v5"
@@ -79,8 +81,12 @@ func main() {
 	recommenderv1.RegisterRecommenderServiceServer(grpcServer, server.New(recommend.New(pool, rdb)))
 	reflection.Register(grpcServer)
 
+	healthSrc := health.NewServer()
+	healthpb.RegisterHealthServer(grpcServer, healthSrc)
+
 	go func() {
 		<-ctx.Done()
+		healthSrc.Shutdown()
 		log.Println("shutting down gRPC server...")
 		grpcServer.GracefulStop()
 	}()
