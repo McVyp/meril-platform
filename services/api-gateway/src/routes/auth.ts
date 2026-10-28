@@ -79,6 +79,27 @@ authRouter.post("/sync", async (req: Request, res: Response) => {
         });
       }
     }
+    const body = z
+      .object({ sessionId: z.uuid().optional() })
+      .safeParse(req.body);
+    const sessionId = body.success ? body.data.sessionId : undefined;
+    if (sessionId) {
+      try {
+        const { count } = await db.interaction.updateMany({
+          where: { sessionId, userId: null },
+          data: { userId: user.id },
+        });
+        if (count > 0)
+          console.log(
+            `Attached ${count} guest interactions to user ${user.id}`,
+          );
+      } catch (err) {
+        console.error(
+          `Failed to attach guest interactions for session ${sessionId}:`,
+          err,
+        );
+      }
+    }
 
     res.json({ user });
   } catch (err) {

@@ -14,6 +14,7 @@ import { emitEvent } from "../lib/kafkaProducer";
 import { rateLimit } from "../middleware/rateLimit";
 import { redis } from "../lib/redis";
 import { clientKey } from "../lib/clientIp";
+import { getRecommendations } from "../lib/recommender";
 
 export const videoRouter = Router();
 
@@ -26,6 +27,31 @@ const BUCKET = process.env.S3_RAW_BUCKET!;
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+
+// add a playback URL to a video if it has an S3 raw key and no HLS URL
+async function withPlaybackUrl<
+  T extends { s3RawKey?: string | null; hlsUrl?: string | null },
+>(video: T) {
+  if (!video.s3RawKey || video.hlsUrl) return { ...video, playbackUrl: null };
+  const playbackUrl = await getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: BUCKET, Key: video.s3RawKey }),
+    { expiresIn: 3600 },
+  );
+  return { ...video, playbackUrl };
+}
+
+// load videos in the order of the given IDs, only include READY videos
+async function videosInOrder(ids: string[]) {
+  const rows = await db.video.findMany({
+    where: { id: { in: ids }, status: "READY" },
+  });
+  const byId = new Map(rows.map((v) => [v.id, v]));
+  return ids.flatMap((id) => {
+    const v = byId.get(id);
+    return v ? [v] : [];
+  });
+}
 
 videoRouter.get("/search", async (req, res) => {
   try {
@@ -108,6 +134,57 @@ videoRouter.get("/", async (req, res) => {
   } catch (err) {
     console.error("GET /api/videos error:", err);
     res.status(500).json({ error: "Failed to fetch videos" });
+  }
+});
+
+// "For You" feed: personalized order from the recommender; falls  back to the latest videos if the recommender is slow, down, or has nothing yet.
+videoRouter.get("/recommended", optionalAuth, async (req, res) => {
+  const querySchema = z.object({
+    sessionId: z.uuid().optional(),
+    limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
+  });
+  const parsed = querySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: z.flattenError(parsed.error) });
+    return;
+  }
+  const { sessionId, limit = DEFAULT_PAGE_SIZE } = parsed.data;
+  try {
+    let userId: string | undefined;
+    if (req.auth?.sub) {
+      const dbUser = await db.user.findUnique({
+        where: { cognitoSub: req.auth.sub },
+        select: { id: true },
+      });
+      userId = dbUser?.id;
+    }
+
+    let ids: string[] = [];
+    try {
+      ids = await getRecommendations({ userId, sessionId, limit });
+    } catch (err) {
+      console.warn(
+        "Error fetching recommended video IDs:",
+        (err as Error).message,
+      );
+    }
+
+    const source = ids.length > 0 ? "recommender" : "fallback";
+    const videos =
+      ids.length > 0
+        ? await videosInOrder(ids)
+        : await db.video.findMany({
+            where: { status: "READY" },
+            orderBy: { createdAt: "desc" },
+            take: limit,
+          });
+    res.json({
+      videos: await Promise.all(videos.map(withPlaybackUrl)),
+      source,
+    });
+  } catch (err) {
+    console.error("GET /api/videos/recommended error:", err);
+    res.status(500).json({ error: "Failed to fetch recommended videos" });
   }
 });
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	pgxvec "github.com/pgvector/pgvector-go/pgx"
 	"github.com/redis/go-redis/v9"
 
@@ -23,6 +24,7 @@ import (
 )
 
 func main() {
+	_ = godotenv.Load()
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL is not set")
