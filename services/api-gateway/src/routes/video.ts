@@ -28,23 +28,34 @@ const BUCKET = process.env.S3_RAW_BUCKET!;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
+const feedSelect = {
+  id: true,
+  title: true,
+  description: true,
+  hlsUrl: true,
+  isAiGenerated: true,
+  s3RawKey: true,
+} as const;
+
 // add a playback URL to a video if it has an S3 raw key and no HLS URL
 async function withPlaybackUrl<
   T extends { s3RawKey?: string | null; hlsUrl?: string | null },
 >(video: T) {
-  if (!video.s3RawKey || video.hlsUrl) return { ...video, playbackUrl: null };
+  const { s3RawKey, ...publicFields } = video;
+  if (!s3RawKey || video.hlsUrl) return { ...publicFields, playbackUrl: null };
   const playbackUrl = await getSignedUrl(
     s3,
-    new GetObjectCommand({ Bucket: BUCKET, Key: video.s3RawKey }),
+    new GetObjectCommand({ Bucket: BUCKET, Key: s3RawKey }),
     { expiresIn: 3600 },
   );
-  return { ...video, playbackUrl };
+  return { ...publicFields, playbackUrl };
 }
 
 // load videos in the order of the given IDs, only include READY videos
 async function videosInOrder(ids: string[]) {
   const rows = await db.video.findMany({
     where: { id: { in: ids }, status: "READY" },
+    select: feedSelect,
   });
   const byId = new Map(rows.map((v) => [v.id, v]));
   return ids.flatMap((id) => {
@@ -61,7 +72,7 @@ videoRouter.get("/search", async (req, res) => {
     });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.flatten() });
+      res.status(400).json({ error: z.flattenError(parsed.error) });
       return;
     }
     const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
@@ -73,19 +84,10 @@ videoRouter.get("/search", async (req, res) => {
       },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: {
-        id: true,
-        title: true,
-        thumbnailUrl: true,
-        hlsUrl: true,
-        duration: true,
-        viewCount: true,
-        userId: true,
-        isAiGenerated: true,
-      },
+      select: feedSelect,
     });
 
-    res.json({ videos });
+    res.json({ videos: await Promise.all(videos.map(withPlaybackUrl)) });
   } catch (err) {
     console.error("GET /api/videos/search error:", err);
     res.status(500).json({ error: "Failed to search videos" });
@@ -100,7 +102,7 @@ videoRouter.get("/", async (req, res) => {
     });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.flatten() });
+      res.status(400).json({ error: z.flattenError(parsed.error) });
       return;
     }
     const { cursor, limit = DEFAULT_PAGE_SIZE } = parsed.data;
@@ -109,23 +111,13 @@ videoRouter.get("/", async (req, res) => {
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      select: feedSelect,
     });
 
     const hasMore = videos.length > limit;
     const page = hasMore ? videos.slice(0, limit) : videos;
 
-    const videosWithUrls = await Promise.all(
-      page.map(async (video) => {
-        if (!video.s3RawKey || video.hlsUrl)
-          return { ...video, playbackUrl: null };
-        const playbackUrl = await getSignedUrl(
-          s3,
-          new GetObjectCommand({ Bucket: BUCKET, Key: video.s3RawKey }),
-          { expiresIn: 3600 },
-        );
-        return { ...video, playbackUrl };
-      }),
-    );
+    const videosWithUrls = await Promise.all(page.map(withPlaybackUrl));
 
     res.json({
       videos: videosWithUrls,
@@ -177,6 +169,7 @@ videoRouter.get("/recommended", optionalAuth, async (req, res) => {
             where: { status: "READY" },
             orderBy: { createdAt: "desc" },
             take: limit,
+            select: feedSelect,
           });
     res.json({
       videos: await Promise.all(videos.map(withPlaybackUrl)),
@@ -202,7 +195,7 @@ videoRouter.post(
 
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.flatten() });
+        res.status(400).json({ error: z.flattenError(parsed.error) });
         return;
       }
 
@@ -370,7 +363,7 @@ videoRouter.post("/", requireAuth, requireDbUser, async (req, res) => {
 
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.flatten() });
+      res.status(400).json({ error: z.flattenError(parsed.error) });
       return;
     }
 
