@@ -1,5 +1,6 @@
-import os
 import json
+import os
+
 from confluent_kafka import Producer
 
 _producer: Producer | None = None

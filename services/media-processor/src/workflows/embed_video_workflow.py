@@ -1,7 +1,7 @@
 from datetime import timedelta
+
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-
 
 with workflow.unsafe.imports_passed_through():
     from src.activities.embed import generate_embedding

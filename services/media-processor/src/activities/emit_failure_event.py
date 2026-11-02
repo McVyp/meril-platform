@@ -1,6 +1,8 @@
 import os
 from typing import Any
+
 from temporalio import activity
+
 from src.kafka.producer import emit_event
 
 KAFKA_TOPIC_TRANSCODE = os.environ.get(

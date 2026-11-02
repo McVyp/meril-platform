@@ -1,17 +1,18 @@
 from datetime import timedelta
+
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError
 
 with workflow.unsafe.imports_passed_through():
-    from src.activities.transcode import transcode_to_hls
     from src.activities.embed import generate_embedding
     from src.activities.emit_failure_event import (
-        emit_transcode_failed,
-        emit_transcode_completed,
         emit_embedding_computed,
+        emit_transcode_completed,
+        emit_transcode_failed,
     )
     from src.activities.provenance import check_provenance
+    from src.activities.transcode import transcode_to_hls
 
 EMIT_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=2),

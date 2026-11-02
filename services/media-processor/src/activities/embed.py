@@ -26,7 +26,7 @@ def build_text(title: str, description: str | None) -> str:
 
 
 def embedding_hash(text: str) -> str:
-    return hashlib.sha256(f"{MODEL_ID}\n{text}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{MODEL_ID}\n{text}".encode()).hexdigest()
 
 
 def _chunks(title: str, description: str | None) -> list[str]:

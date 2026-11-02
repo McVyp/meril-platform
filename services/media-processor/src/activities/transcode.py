@@ -1,10 +1,10 @@
 import asyncio
 import os
 import tempfile
+
 import boto3
 import ffmpeg
 from temporalio import activity
-from src.kafka.producer import emit_event
 
 S3_RAW_BUCKET = os.environ.get("S3_RAW_BUCKET", "meril-raw")
 S3_HLS_BUCKET = os.environ.get("S3_HLS_BUCKET", "meril-hls")

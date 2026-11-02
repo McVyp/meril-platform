@@ -1,5 +1,6 @@
 import asyncio
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -7,18 +8,16 @@ load_dotenv()
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from src.activities.transcode import transcode_to_hls
-from src.activities.embed import generate_embedding, embed
+from src.activities.embed import embed, generate_embedding
 from src.activities.emit_failure_event import (
-    emit_transcode_failed,
-    emit_transcode_completed,
     emit_embedding_computed,
+    emit_transcode_completed,
+    emit_transcode_failed,
 )
 from src.activities.provenance import check_provenance
-
-from src.workflows.transcode_workflow import TranscodeWorkflow
+from src.activities.transcode import transcode_to_hls
 from src.workflows.embed_video_workflow import EmbedVideoWorkflow
-
+from src.workflows.transcode_workflow import TranscodeWorkflow
 
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 TEMPORAL_NAMESPACE = os.environ.get("TEMPORAL_NAMESPACE", "default")
@@ -40,7 +39,7 @@ async def warm_up_emebedding_model() -> None:
 async def main():
     await warm_up_emebedding_model()
 
-    connect_kwargs = dict(namespace=TEMPORAL_NAMESPACE)
+    connect_kwargs = {"namespace": TEMPORAL_NAMESPACE}
     client = await Client.connect(TEMPORAL_HOST, **connect_kwargs)
     worker = Worker(
         client,
