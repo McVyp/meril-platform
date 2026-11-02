@@ -15,6 +15,7 @@ import { rateLimit } from "../middleware/rateLimit";
 import { redis } from "../lib/redis";
 import { clientKey } from "../lib/clientIp";
 import { getRecommendations } from "../lib/recommender";
+import type { Prisma } from "@meril/db";
 
 export const videoRouter = Router();
 
@@ -36,6 +37,8 @@ const feedSelect = {
   isAiGenerated: true,
   s3RawKey: true,
 } as const;
+
+type SearchRow = Prisma.VideoGetPayload<{ select: typeof feedSelect }>;
 
 // add a playback URL to a video if it has an S3 raw key and no HLS URL
 async function withPlaybackUrl<
@@ -77,15 +80,18 @@ videoRouter.get("/search", async (req, res) => {
     }
     const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
 
-    const videos = await db.video.findMany({
-      where: {
-        status: "READY",
-        title: { contains: q, mode: "insensitive" },
-      },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-      select: feedSelect,
-    });
+    const videos = await db.$queryRaw<SearchRow[]>`
+      SELECT id, title, description, "hlsUrl", "isAiGenerated", "s3RawKey"
+      FROM "Video"
+      WHERE status = 'READY'
+        AND (${q} <% title OR ${q} <% description)
+      ORDER BY GREATEST(
+        word_similarity(${q}, title),
+        0.5 * word_similarity(${q}, coalesce(description, ''))
+      ) DESC,
+      "createdAt" DESC
+      LIMIT ${limit};
+    `;
 
     res.json({ videos: await Promise.all(videos.map(withPlaybackUrl)) });
   } catch (err) {
@@ -108,6 +114,7 @@ videoRouter.get("/", async (req, res) => {
     const { cursor, limit = DEFAULT_PAGE_SIZE } = parsed.data;
 
     const videos = await db.video.findMany({
+      where: { status: "READY" },
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
