@@ -291,7 +291,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="absolute top-[7%] right-1/6 z-30 p-8 flex flex-col items-start gap-4 min-w-[20vw]">
+      <div className="absolute top-[7%] right-1/6 z-30 p-8 flex flex-col items-start gap-4 min-w-[20vw] md:w-[min(56rem,60vw)]">
         {!isDesktop && (
           <SearchBar<ApiVideo>
             active={searchActive}
@@ -315,10 +315,14 @@ export default function Home() {
           />
         )}
 
-        {searchStatus === "searching" ? (
-          <p className="text-white/40 text-[3rem]">Searching...</p>
-        ) : searchStatus === "empty" ? (
-          <p className="text-white/40 text-[3rem]">Not found</p>
+        {searchStatus === "searching" || searchStatus === "empty" ? (
+          <div className="py-[6vh]">
+            <p className="text-white/40 text-[3rem]">
+              {searchStatus === "searching"
+                ? "Searching..."
+                : "No Results Found"}
+            </p>
+          </div>
         ) : (
           <Title
             currentIndex={currentIndex}
