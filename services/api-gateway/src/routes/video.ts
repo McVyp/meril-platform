@@ -17,10 +17,7 @@ import { clientKey } from "../lib/clientIp";
 import { getRecommendations } from "../lib/recommender";
 import { embedQuery } from "../lib/embedder";
 import { fuseRankings } from "../lib/rankFusion";
-import {
-  keepCloseMatches,
-  MIN_QUERY_SIMILARITY
-} from "../lib/semanticCutoff";
+import { keepCloseMatches, MIN_QUERY_SIMILARITY } from "../lib/semanticCutoff";
 
 export const videoRouter = Router();
 
