@@ -8,14 +8,18 @@ export function verifyEventBridgeAuth(
 ) {
   const provided = req.headers["x-webhook-secret"];
   const expected = process.env.EVENTBRIDGE_WEBHOOK_SECRET;
-  if (
-    typeof provided !== "string" ||
-    !expected ||
-    provided.length !== expected.length ||
-    !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
-  ) {
+
+  if (typeof provided !== "string" || !expected) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
+
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   next();
 }

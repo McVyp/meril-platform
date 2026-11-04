@@ -19,10 +19,15 @@ export function rateLimit(options: RateLimitOptions) {
     const key = `ratelimit:${keyPrefix}:${identifier}`;
 
     try {
-      const current = await redis.incr(key);
-      if (current === 1) {
-        await redis.expire(key, windowSeconds);
+      const results = await redis
+        .multi()
+        .incr(key)
+        .expire(key, windowSeconds, "NX")
+        .exec();
+      if (!results || results.some(([err]) => err)) {
+        throw new Error("rate limit transaction failed");
       }
+      const current = Number(results[0][1]);
       if (current > maxRequests) {
         const ttl = await redis.ttl(key);
         res.status(429).json({
