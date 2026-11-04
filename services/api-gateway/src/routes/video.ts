@@ -120,34 +120,38 @@ function fuseRankings(...lists: string[][]): string[] {
   return [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
 
-videoRouter.get("/search", async (req, res) => {
-  try {
-    const querySchema = z.object({
-      q: z.string().trim().min(1).max(100),
-      limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
-    });
-    const parsed = querySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: z.flattenError(parsed.error) });
-      return;
-    }
-    const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
+videoRouter.get(
+  "/search",
+  rateLimit({ windowSeconds: 60, maxRequests: 60, keyPrefix: "search" }),
+  async (req, res) => {
+    try {
+      const querySchema = z.object({
+        q: z.string().trim().min(1).max(100),
+        limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
+      });
+      const parsed = querySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: z.flattenError(parsed.error) });
+        return;
+      }
+      const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
 
-    const [keywordIds, semanticIds] = await Promise.all([
-      keywordSearch(q),
-      semanticSearch(q),
-    ]);
-    const ids = fuseRankings(keywordIds, semanticIds).slice(0, limit);
-    const videos = await videosInOrder(ids);
-    res.json({
-      videos: await Promise.all(videos.map(withPlaybackUrl)),
-      mode: semanticIds.length > 0 ? "hybrid" : "keyword",
-    });
-  } catch (err) {
-    console.error("GET /api/videos/search error:", err);
-    res.status(500).json({ error: "Failed to search videos" });
-  }
-});
+      const [keywordIds, semanticIds] = await Promise.all([
+        keywordSearch(q),
+        semanticSearch(q),
+      ]);
+      const ids = fuseRankings(keywordIds, semanticIds).slice(0, limit);
+      const videos = await videosInOrder(ids);
+      res.json({
+        videos: await Promise.all(videos.map(withPlaybackUrl)),
+        mode: semanticIds.length > 0 ? "hybrid" : "keyword",
+      });
+    } catch (err) {
+      console.error("GET /api/videos/search error:", err);
+      res.status(500).json({ error: "Failed to search videos" });
+    }
+  },
+);
 
 videoRouter.get("/", async (req, res) => {
   try {
