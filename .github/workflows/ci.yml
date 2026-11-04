@@ -67,17 +67,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
-      - run: uvx ruff format --check services/media-processor
-      - run: uvx ruff check services/media-processor
+      - run: uvx ruff format --check services/media-processor services/embedder
+      - run: uvx ruff check services/media-processor services/embedder
 
   migrations:
-    name: Migrations (HNSW guard)
+    name: Migrations (index guard)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: No migration drops the HNSW index
+      - name: No migration drops custom indexes
         run: |
-          if grep -rn 'DROP INDEX "Video_embedding_hnsw_idx"' packages/db/prisma/migrations; then
-            echo "Error: Migration drops the HNSW index"
+          if grep -rnE 'DROP INDEX "Video_(embedding_hnsw|title_trgm|description_trgm)_idx"' packages/db/prisma/migrations; then
+            echo "Error: a migration drops a custom index (HNSW or trigram)"
             exit 1
           fi
