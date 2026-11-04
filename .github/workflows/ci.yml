@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ meril, main ]
+    branches: [meril, main]
   pull_request:
 
 permissions:

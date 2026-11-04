@@ -15,7 +15,7 @@ import { rateLimit } from "../middleware/rateLimit";
 import { redis } from "../lib/redis";
 import { clientKey } from "../lib/clientIp";
 import { getRecommendations } from "../lib/recommender";
-import type { Prisma } from "@meril/db";
+import { embedQuery } from "../lib/embedder";
 
 export const videoRouter = Router();
 
@@ -37,8 +37,6 @@ const feedSelect = {
   isAiGenerated: true,
   s3RawKey: true,
 } as const;
-
-type SearchRow = Prisma.VideoGetPayload<{ select: typeof feedSelect }>;
 
 // add a playback URL to a video if it has an S3 raw key and no HLS URL
 async function withPlaybackUrl<
@@ -67,6 +65,61 @@ async function videosInOrder(ids: string[]) {
   });
 }
 
+const SEARCH_CANDIDATES = 50; // per list, before merging
+const MIN_QUERY_SIMILARITY = 0.3; // cosine; below this a "meaning" match is noise
+const MAX_GAP_FROM_BEST = 0.2; // drop matches far below the query's best match
+const RRF_K = 60; // standard Reciprocal Rank Fusion constant
+
+async function keywordSearch(q: string): Promise<string[]> {
+  const rows = await db.$queryRaw<{ id: string }[]>`
+    SELECT id from "Video"
+    WHERE status = 'READY'
+      AND (${q} <% title OR ${q} <% description)
+    ORDER BY GREATEST(
+      word_similarity(${q}, title),
+      0.5 * word_similarity(${q}, coalesce(description, ''))
+    ) DESC,"createdAt" DESC
+    LIMIT ${SEARCH_CANDIDATES};
+  `;
+  return rows.map((r) => r.id);
+}
+
+// returns [] if the embedder is down or returns no results
+async function semanticSearch(q: string): Promise<string[]> {
+  let embedding: number[];
+  try {
+    embedding = await embedQuery(q);
+  } catch (err) {
+    console.warn("embedder unavailable:", (err as Error).message);
+    return [];
+  }
+
+  const vec = `[${embedding.join(",")}]`;
+  const rows = await db.$queryRaw<{ id: string; sim: number }[]>`
+    SELECT id, 1- (embedding <=> ${vec}::vector) AS sim
+    FROM "Video"
+    WHERE status = 'READY'
+      AND embedding IS NOT NULL
+      AND embedding <=> ${vec}::vector < ${1 - MIN_QUERY_SIMILARITY}
+    ORDER BY embedding <=> ${vec}::vector
+    LIMIT ${SEARCH_CANDIDATES};
+  `;
+  if (rows.length === 0) return [];
+  const cutoff = rows[0].sim - MAX_GAP_FROM_BEST;
+  return rows.filter((r) => r.sim >= cutoff).map((r) => r.id);
+}
+
+// reciprocal rank fusion: sum 1/(k + rank) over every list a video appears in
+function fuseRankings(...lists: string[][]): string[] {
+  const scores = new Map<string, number>();
+  for (const list of lists) {
+    list.forEach((id, i) => {
+      scores.set(id, (scores.get(id) ?? 0) + 1 / (RRF_K + i + 1));
+    });
+  }
+  return [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
 videoRouter.get("/search", async (req, res) => {
   try {
     const querySchema = z.object({
@@ -80,20 +133,16 @@ videoRouter.get("/search", async (req, res) => {
     }
     const { q, limit = DEFAULT_PAGE_SIZE } = parsed.data;
 
-    const videos = await db.$queryRaw<SearchRow[]>`
-      SELECT id, title, description, "hlsUrl", "isAiGenerated", "s3RawKey"
-      FROM "Video"
-      WHERE status = 'READY'
-        AND (${q} <% title OR ${q} <% description)
-      ORDER BY GREATEST(
-        word_similarity(${q}, title),
-        0.5 * word_similarity(${q}, coalesce(description, ''))
-      ) DESC,
-      "createdAt" DESC
-      LIMIT ${limit};
-    `;
-
-    res.json({ videos: await Promise.all(videos.map(withPlaybackUrl)) });
+    const [keywordIds, semanticIds] = await Promise.all([
+      keywordSearch(q),
+      semanticSearch(q),
+    ]);
+    const ids = fuseRankings(keywordIds, semanticIds).slice(0, limit);
+    const videos = await videosInOrder(ids);
+    res.json({
+      videos: await Promise.all(videos.map(withPlaybackUrl)),
+      mode: semanticIds.length > 0 ? "hybrid" : "keyword",
+    });
   } catch (err) {
     console.error("GET /api/videos/search error:", err);
     res.status(500).json({ error: "Failed to search videos" });
