@@ -1,10 +1,11 @@
 import os
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import numpy as np
 from fastapi import FastAPI, Request
 from fastembed import TextEmbedding
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, StringConstraints
 
 MODEL_ID = os.environ.get(
     "EMBEDDING_MODEL",
@@ -22,7 +23,9 @@ app = FastAPI(lifespan=lifespan)
 
 
 class EmbedRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=200)
+    text: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+    ]
 
 
 class EmbedResponse(BaseModel):
@@ -36,7 +39,7 @@ def health():
 
 @app.post("/embed")
 def embed(body: EmbedRequest, request: Request) -> EmbedResponse:
-    vector = next(iter(request.app.state.model.embed([body.text.strip()])))
+    vector = next(iter(request.app.state.model.embed([body.text])))
     norm = np.linalg.norm(vector)
     if norm > 0:
         vector = vector / norm
