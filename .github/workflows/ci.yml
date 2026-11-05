@@ -30,6 +30,9 @@ jobs:
       - run: pnpm --filter @meril/db build
       - run: pnpm --filter @meril/api-gateway type-check
       - run: pnpm --filter @meril/api-gateway test
+      - name: Gateway dependecies load at runtime
+        working-directory: services/api-gateway
+        run: node -e "for (const d of Object.keys(require('./package.json').dependencies)) require(d)"
       - run: pnpm --filter @meril/event-consumer type-check
       - run: pnpm --filter web exec next typegen
       - run: pnpm --filter web exec tsc --noEmit

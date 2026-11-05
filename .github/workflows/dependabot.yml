@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    
+  - package-ecosystem: gomod
+    directory: /services/recommender
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    
+  - package-ecosystem: uv
+    directories: ["/services/embedder", "/services/media-processor"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: docker
+    directories: ["/services/embedder", "/services/media-processor", "/services/recommender"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
