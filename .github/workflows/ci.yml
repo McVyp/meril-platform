@@ -29,6 +29,7 @@ jobs:
       - run: pnpm --filter @meril/db generate
       - run: pnpm --filter @meril/db build
       - run: pnpm --filter @meril/api-gateway type-check
+      - run: pnpm --filter @meril/api-gateway test
       - run: pnpm --filter @meril/event-consumer type-check
       - run: pnpm --filter web exec next typegen
       - run: pnpm --filter web exec tsc --noEmit
@@ -49,6 +50,7 @@ jobs:
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - run: go vet ./...
       - run: go build ./...
+      - run: go test ./...
 
   proto:
     name: Proto (buf)
@@ -62,13 +64,16 @@ jobs:
       - run: buf format -d --exit-code
 
   python:
-    name: Python (ruff)
+    name: Python (ruff, tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
       - run: uvx ruff format --check services/media-processor services/embedder
       - run: uvx ruff check services/media-processor services/embedder
+      - name: Embedder tests
+        working-directory: services/embedder
+        run: uv run pytest -q
 
   migrations:
     name: Migrations (index guard)
