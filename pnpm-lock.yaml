@@ -163,10 +163,10 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  body-parser: ^2.4.0
-  '@grpc/grpc-js': ^1.14.5
-  protobufjs: ^7.6.5
-  uuid: ^11.1.1
+  body-parser@<2.4.0: ^2.4.0
+  '@grpc/grpc-js@<1.14.5': ^1.14.5
+  protobufjs@<7.6.5: ^7.6.5
+  uuid@<11.1.1: ^11.1.1
 
 importers:
 
@@ -322,7 +322,7 @@ importers:
         version: 7.8.0
       '@temporalio/client':
         specifier: ^1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@7.6.6)
+        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -2698,14 +2698,14 @@ packages:
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
-      protobufjs: ^7.6.5
+      protobufjs: ^8.7.1
 
   '@temporalio/common@1.25.0':
     resolution: {integrity: sha512-R9q/5wJZLi47kktJ3GfGh+eMO2HleRxKQGDysCvoObdVjK7Q+F+Vq0M1EeMu4EMHQZdT9A4vgN5rQ9L8cTgU8w==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
-      protobufjs: ^7.6.5
+      protobufjs: ^8.7.1
 
   '@temporalio/proto@1.25.0':
     resolution: {integrity: sha512-cZF6C1F4ZHWrVwrDNW6hTB7HvBi1sofqPWxQrqJq0b9hPE21y5IU5rTNEUx3Ju6G03xqdpwdH0LECAul0KAi2Q==}
@@ -5052,6 +5052,10 @@ packages:
 
   protobufjs@7.6.6:
     resolution: {integrity: sha512-dYDWdjSl5RNb7SgPxGQcRU+GtvP7s2fpkrY0r432PcOIaZ0/rBcxEZnQN67iJhFuQiVw754JDoPruPCNdGsbjg==}
+    engines: {node: '>=12.0.0'}
+
+  protobufjs@8.8.1:
+    resolution: {integrity: sha512-d9e9179bjXSJdpJ3+R9fP8hzXsnKLyxTjHLG1dUzje8a27pPyXCe6PrcRtgx2rjoM3IZzHd2vAs+6J/BsO1k7Q==}
     engines: {node: '>=12.0.0'}
 
   proxy-addr@2.0.8:
@@ -8630,28 +8634,28 @@ snapshots:
       postcss: 8.5.15
       tailwindcss: 4.3.1
 
-  '@temporalio/client@1.25.0(long@5.3.2)(protobufjs@7.6.6)':
+  '@temporalio/client@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
       '@grpc/grpc-js': 1.14.7
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@7.6.6)
+      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
       '@temporalio/proto': 1.25.0
       long: 5.3.2
       nexus-rpc: 0.0.3
-      protobufjs: 7.6.6
+      protobufjs: 8.8.1
       uuid: 11.1.1
 
-  '@temporalio/common@1.25.0(long@5.3.2)(protobufjs@7.6.6)':
+  '@temporalio/common@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
       '@temporalio/proto': 1.25.0
       long: 5.3.2
       ms: 3.0.0-canary.202508261828
       nexus-rpc: 0.0.3
-      protobufjs: 7.6.6
+      protobufjs: 8.8.1
 
   '@temporalio/proto@1.25.0':
     dependencies:
       long: 5.3.2
-      protobufjs: 7.6.6
+      protobufjs: 8.8.1
 
   '@ts-morph/common@0.27.0':
     dependencies:
@@ -11012,6 +11016,10 @@ snapshots:
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.1
       '@types/node': 25.9.3
+      long: 5.3.2
+
+  protobufjs@8.8.1:
+    dependencies:
       long: 5.3.2
 
   proxy-addr@2.0.8:

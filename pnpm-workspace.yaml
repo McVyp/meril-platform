@@ -21,7 +21,7 @@ onlyBuiltDependencies:
 verifyDepsBeforeRun: false
 
 overrides:
-  body-parser: "^2.4.0"
-  "@grpc/grpc-js": "^1.14.5"
-  protobufjs: "^7.6.5"
-  uuid: "^11.1.1"
+  "body-parser@<2.4.0": "^2.4.0"
+  "@grpc/grpc-js@<1.14.5": "^1.14.5"
+  "protobufjs@<7.6.5": "^7.6.5"
+  "uuid@<11.1.1": "^11.1.1"
