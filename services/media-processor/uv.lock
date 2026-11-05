@@ -44,7 +44,7 @@ wheels = [
 
 [[package]]
 name = "c2pa-python"
-version = "0.38.1"
+version = "0.38.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -52,11 +52,8 @@ dependencies = [
     { name = "toml" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/2e/29084cc8661fb32f5de22fc5d2547a04aa1705397a68271b69c218ce83d5/c2pa_python-0.38.1-py3-none-macosx_10_9_universal2.whl", hash = "sha256:fc7fc29ad594f3b2a4caaf0081169dab417e8b48c926397cc51a41c5564bfd46", size = 17096106, upload-time = "2026-10-22T00:15:30.465Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/bc/c70a0197b83d43764038d09d4cc8616c6082f10a92966175d35edc101539/c2pa_python-0.38.1-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:c29dab574ccf3ee00ea343ea01b27cd03f548cdddd381bfd33476ab67736d6b4", size = 15431164, upload-time = "2026-10-22T00:15:33.628Z" },
-    { url = "https://files.pythonhosted.org/packages/ad/0b/288325ab3a143e237be5a590db45ed232968d093abc7199e3031b141d019/c2pa_python-0.38.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:299753a0106cba5cdeedb4056c6d9721a37a0eb7f6dccfc43db91d1347b23b7e", size = 15007485, upload-time = "2026-10-22T00:15:36.522Z" },
-    { url = "https://files.pythonhosted.org/packages/cd/71/e9a328fa5e3677a8479dc583e457f1ab36920a2b02b3f4256e6b8ac7ff7d/c2pa_python-0.38.1-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:d40fe8adc79ced9d9e8019e28f1fb53104c99f13aedcfc5999935113e57509db", size = 15206799, upload-time = "2026-10-22T00:15:39.445Z" },
-    { url = "https://files.pythonhosted.org/packages/b5/2e/6a131900eee4b16ead22a7b1e0a103bc2041d8b5b49fcdee5e2ae1721af3/c2pa_python-0.38.1-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:0885fc72b7741b2af91305d1768618c827d802fa8963cd11f2fe2d00500651d0", size = 15955538, upload-time = "2026-10-22T00:15:42.684Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/37/8cc660bb1eb810ffed578fa0c67a0506797b6bd1d51a62ad4b1f22f4311e/c2pa_python-0.38.2-py3-none-macosx_10_9_universal2.whl", hash = "sha256:8141c70b5fe2dbc2ad03afc4d8c2cf4fa116be7312dff2b0c31589b4906847fc", size = 17273734, upload-time = "2026-10-26T21:30:43.802Z" },
+    { url = "https://files.pythonhosted.org/packages/48/71/eca30213f35e71dd33600afc48f37516f8868e36a89031d7c1036ae3c7a5/c2pa_python-0.38.2-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:b96bbdeeb88e544b7b3b5d1d041ce536084c004553a1a54f509a9353442a3763", size = 15524979, upload-time = "2026-10-26T21:30:47.342Z" },
 ]
 
 [[package]]
