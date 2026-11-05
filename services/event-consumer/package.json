@@ -10,17 +10,17 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.1149.0",
+    "@aws-sdk/client-sqs": "^3.1159.0",
     "@meril/db": "workspace:*",
-    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/adapter-pg": "^7.10.1",
     "dotenv": "^17.4.2",
     "kafkajs": "^2.2.4",
-    "pg": "^8.21.0"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "@types/pg": "^8.20.0",
-    "tsx": "^4.22.4",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
   "engines": {
