@@ -22,17 +22,17 @@
     "@connectrpc/connect-node": "^2.2.0",
     "@meril/db": "workspace:*",
     "@prisma/adapter-pg": "^7.8.0",
-    "@temporalio/client": "^1.18.1",
+    "@temporalio/client": "^1.25.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "helmet": "^8.2.0",
     "ioredis": "^5.11.1",
     "jose": "^6.2.3",
     "kafkajs": "^2.2.4",
     "pg": "^8.21.0",
     "ws": "^8.21.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@bufbuild/protoc-gen-es": "^2.16.0",

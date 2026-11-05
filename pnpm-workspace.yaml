@@ -19,3 +19,9 @@ onlyBuiltDependencies:
   - prisma
   - protobufjs
 verifyDepsBeforeRun: false
+
+overrides:
+  body-parser: "^2.4.0"
+  "@grpc/grpc-js": "^1.14.5"
+  protobufjs: "^7.6.5"
+  uuid: "^11.1.1"
