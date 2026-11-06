@@ -81,11 +81,14 @@ describe("rateLimit", () => {
     expect(redis.expire).toHaveBeenCalledWith(expect.any(String), 60, "NX");
   });
 
-  it("lets requests through when Redis fails", async () => {
-    vi.spyOn(console, "error").mockImplementationOnce(() => {});
-    vi.mocked(redis.multi).mockImplementationOnce(() => {
+  it("falls back to in-memory store when Redis is unavailable", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(redis.multi).mockImplementation(() => {
       throw new Error("redis down");
     });
-    expect((await hit()).next).toHaveBeenCalled();
+    const ip = "9.9.9.9";
+    expect((await hit(ip)).next).toHaveBeenCalled();
+    expect((await hit(ip)).next).toHaveBeenCalled();
+    expect((await hit(ip)).res.status).toHaveBeenCalledWith(429);
   });
 });

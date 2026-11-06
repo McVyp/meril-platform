@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { redis } from "../lib/redis";
+import { db } from "../lib/db";
 
 export async function dedupEventBridgeEvent(
   req: Request,
@@ -7,20 +7,34 @@ export async function dedupEventBridgeEvent(
   next: NextFunction,
 ) {
   const eventId = req.body?.id;
-  if (!eventId) {
+  if (typeof eventId !== "string" || !eventId) {
     next();
     return;
   }
   try {
-    const key = `event:dedup:${eventId}`;
-    const result = await redis.set(key, "1", "EX", 300, "NX");
-    if (result !== "OK") {
+    await db.processedEvent.create({ data: { id: eventId } });
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2002") {
+      // Duplicate event, ignore it
       res.status(200).json({ received: true, duplicate: true });
       return;
     }
-    next();
-  } catch (err) {
     console.error("Error in dedupEventBridge middleware:", err);
-    next();
+    res.status(500).json({ error: "Internal server error" });
+    return;
   }
+
+  res.on("finish", async () => {
+    if (res.statusCode >= 500) {
+      db.processedEvent
+        .delete({ where: { id: eventId } })
+        .catch((err) =>
+          console.error(
+            "Error deleting processed event after failed response:",
+            err,
+          ),
+        );
+    }
+  });
+  next();
 }

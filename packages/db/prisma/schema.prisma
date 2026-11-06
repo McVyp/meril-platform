@@ -114,6 +114,13 @@ model Follow {
   @@index([followingId])
 }
 
+model ProcessedEvent {
+  id          String    @id
+  receivedAt  DateTime  @default(now())
+
+  @@index([receivedAt])
+}
+
 enum Role {
   VIEWER
   STREAMER

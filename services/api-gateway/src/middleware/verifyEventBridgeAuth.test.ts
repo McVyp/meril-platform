@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import crypto from "crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { verifyEventBridgeAuth } from "./verifyEventBridgeAuth";
 
@@ -39,5 +40,12 @@ describe("verifyEventBridgeAuth", () => {
     vi.stubEnv("EVENTBRIDGE_WEBHOOK_SECRET", "");
     const { res } = run("");
     expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  it("compares the secret with timingSafeEqual (constant time)", () => {
+    const spy = vi.spyOn(crypto, "timingSafeEqual");
+    run(SECRET);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
