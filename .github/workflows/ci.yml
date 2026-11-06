@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   node:
-    name: Node (type-check)
+    name: Node (type-check, tests)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -45,11 +45,11 @@ jobs:
       - run: pnpm --filter @meril/db exec prisma migrate deploy
       - run: pnpm --filter @meril/api-gateway type-check
       - run: pnpm --filter @meril/api-gateway test
-      - name: Gateway dependecies load at runtime
+      - name: Gateway dependencies load at runtime
         working-directory: services/api-gateway
         run: node -e "for (const d of Object.keys(require('./package.json').dependencies)) require(d)"
       - run: pnpm --filter @meril/event-consumer type-check
-      - name: Event consumer dependecies load at runtime
+      - name: Event consumer dependencies load at runtime
         working-directory: services/event-consumer
         run: node -e "for (const d of Object.keys(require('./package.json').dependencies)) require(d)"
       - run: pnpm --filter web exec next typegen
