@@ -33,7 +33,7 @@ jobs:
       DATABASE_URL: postgres://ci:ci@localhost:5432/ci_test
       TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/ci_test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -78,7 +78,7 @@ jobs:
       run:
         working-directory: services/recommender
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: services/recommender/go.mod
@@ -99,7 +99,7 @@ jobs:
     name: Proto (buf)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true
@@ -110,7 +110,7 @@ jobs:
     name: Python (ruff, tests)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v8.1.0
       - run: uvx ruff format --check services/media-processor services/embedder
       - run: uvx ruff check services/media-processor services/embedder
@@ -125,7 +125,7 @@ jobs:
     name: Migrations (index guard)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: No migration drops custom indexes
         run: |
           if grep -rnE 'DROP INDEX "Video_(embedding_hnsw|title_trgm|description_trgm)_idx"' packages/db/prisma/migrations; then

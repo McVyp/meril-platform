@@ -13,7 +13,7 @@ jobs:
     name: pnpm audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -32,7 +32,7 @@ jobs:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v8.1.0
       - run: uv export --frozen --no-dev --no-hashes --no-emit-project -o requirement-audit.txt
       - run: uvx pip-audit --requirement requirement-audit.txt --disable-pip --no-deps
@@ -44,7 +44,7 @@ jobs:
       run:
         working-directory: services/recommender
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: services/recommender/go.mod
