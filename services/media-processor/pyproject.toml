@@ -13,3 +13,6 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "temporalio>=1.29.0",
 ]
+
+[tool.uv]
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
