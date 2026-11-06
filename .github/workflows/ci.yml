@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uvx ruff format --check services/media-processor services/embedder
       - run: uvx ruff check services/media-processor services/embedder
       - name: Embedder tests
