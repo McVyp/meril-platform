@@ -16,6 +16,9 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
     
   - package-ecosystem: uv
     directories: ["/services/embedder", "/services/media-processor"]
@@ -23,6 +26,9 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
 
   - package-ecosystem: docker
     directories: ["/services/embedder", "/services/media-processor", "/services/recommender"]
@@ -30,6 +36,9 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -37,3 +46,6 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
