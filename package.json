@@ -11,7 +11,7 @@
     "format:proto": "buf format -w"
   },
   "devDependencies": {
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.10",
     "turbo": "latest"
   },
   "packageManager": "pnpm@12.16.1",
