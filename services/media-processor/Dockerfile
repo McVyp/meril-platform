@@ -1,4 +1,4 @@
-FROM python:3.14-rc-slim
+FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
