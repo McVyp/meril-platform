@@ -114,6 +114,9 @@ jobs:
       - name: Embedder tests
         working-directory: services/embedder
         run: uv run pytest -q
+      - name: Media-processor imports load
+        working-directory: services/media-processor
+        run: uv run python -c "import src.worker, src.workflows.transcode_workflow; print('imports ok')"
 
   migrations:
     name: Migrations (index guard)
