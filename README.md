@@ -9,7 +9,7 @@ Meril is a live streaming platform supporting both desktop (RTMP) and mobile (WH
 | Frontend                                           | Next.js (Vercel)                         |
 | API                                                | Express `api-gateway`                    |
 | Database                                           | Postgres                                 |
-| Cache /Idempotency                                 | Redis                                    |
+| Rate limiting / session layer                      | Redis (in-memory fallback)               |
 | Media (RTMP/WHIP Ingest, transcoding, playback)    | AWS IVS                                  |
 | Real-time / multi-participant                      | AWS IVS Real-Time (Stages, Compositions) |
 | Chat                                               | AWS IVS Chat                             |
@@ -18,6 +18,8 @@ Meril is a live streaming platform supporting both desktop (RTMP) and mobile (WH
 | Storage / CDN                                      | AWS S3 + CloudFront                      |
 | Workflow Orchestration                             | Temporal                                 |
 | Background processing                              | `media-processor` worker                 |
+| Recommendations                                    | Go service (gRPC) + pgvector             |
+| Search & embeddings                                | pg_trgm + pgvector, MiniLM embedder      |
 | Async events (view tracking, transcode completion) | Confluent Cloud (Kafka)                  |
 | Monorepo tooling                                   | pnpm                                     |
 
@@ -38,7 +40,6 @@ sequenceDiagram
     participant DB as Postgres
     participant IVS as AWS IVS Real-Time
     participant EB as EventBridge
-    participant R as Redis
 
     M->>AG: POST /api/streams/mobile
     AG->>DB: ensure User has Channel, Encoder Config, Chat Room
@@ -61,14 +62,14 @@ sequenceDiagram
     IVS->>EB: "IVS Stage Update" / "Participant Published"
     EB->>AG: POST /webhook-realtime<br />x-webhook-secret header
     AG->>AG: verifyEventBridgeAuth (timingSafeEqual)
-    AG->>R: SET NX EX 300 evt:dedup:{event.id}
+    AG->>DB: INSERT ProcessedEvent (event.id as primary key)
     alt duplicate event
-        R-->>AG: key exists
+        DB-->>AG: unique violation
         AG-->>EB: 200 {duplicate: true}
     else new event
-        R-->>AG: key set
+        DB-->>AG: claimed
         AG->>DB: find Stream by ivsStageArn
-        AG->>IVS: StartCompositionCommand<br/>(Stage -> Channel + Encoder Config)
+        AG->>IVS: StartCompositionCommand<br />(Stage -> Channel + Encoder Config)
         IVS-->>AG: composition.arn
         AG->>DB: store ivsCompositionId
         AG-->>EB: 200 {received: true}
@@ -89,27 +90,32 @@ flowchart LR
 
     B --> Auth{verifyEventBridgeAuth<br/>x-webhook-secret match?}
     Auth -->|no| R401[401 Unauthorized]
-    Auth -->|yes| Dedup{dedupEventBridgeEvent<br />Redis SET NX EX 300}
-    Dedup -->|already seen| R200D[200 duplicate: true]
-    Dedup -->|new /Redis down<br />fails open| Handler[Route handler logic]
+    Auth -->|yes| Claim{dedupEventBridgeEvent<br/>INSERT ProcessedEvent}
+    Claim -->|id already stored| R200D[200 duplicate: true]
+    Claim -->|database error| R500[500, EventBridge retries]
+    Claim -->|claimed| Handler[Route handler]
+    Handler -->|5xx| Release[claim released, <br/>retry is processed]
     Handler --> DB[(Postgres)]
 ```
 
 **Design notes:**
 
-- `verifyEventBridgeAuth` uses `crypto.timingSafeEqual` rather than a plain string comparison, avoiding timing-attack leakage on the shared secret.
+- `verifyEventBridgeAuth` compares the webhook secret with `crypto.timingSafeEqual` (constant-time), after checking the byte length, so wrong or unusual input gets a 401 instead of leaking timing or causing an error.
 - The DLQ is a safety net, not the primary path - most events should never reach it. Its only job is to make otherwise-silent failures visible via the CloudWatch alarm.
+- Dedup uses a `ProcessedEvent` table keyed by the event id, so Postgres rejects a second delivery of the same event. If the handler fails (5xx), the row is deleted, so EventBridge's retry gets processed.
 
 ## Rate Limiting
 
-Applied as Express middleware using the same Redis instance as webhook dedup. Uses a fixed-window counter: `INCR` on a per-key window, `EXPIRE` set on first increment, `429` once the count exceeds the configured max.
+Express middleware backed by Redis: a fixed-window counter (`INCR` + `EXPIRE` ... `NX` in one `MULTI`), `429` with `retryAfter` once over the limit. If Redis is unavailable, it falls back to an in-memory counter per process, so the limit is approximate but never off.
 
 ```mermaid
 flowchart LR
-  Req[Incoming request] --> RL{rateLimit middleware <br />Redis INCR + EXPIRE}
+  Req[Incoming request] --> RL{rateLimit middleware <br />Redis INCR + EXPIRE NX}
   RL -->|under limit| Handler[Route handler]
-  RL -->|over limit| R429[429 Too Many Requests<br/>+ retryAfterSeconds]
-  RL -->|Redis error<br />fails open| Handler
+  RL -->|over limit| R429[429 Too Many Requests<br/>+ retryAfter]
+  RL -->|Redis error| Mem{in-memory fallback}
+  Mem -->|under limit| Handler
+  Mem -->|over limit| R429
 ```
 
 | Route                                       | Window | Max requests | Key                             |
@@ -118,6 +124,8 @@ flowchart LR
 | `POST /api/streams/mobile` (mobile go-live) | 60s    | 3            | per user                        |
 | `GET /api/streams/:id/mobile-token`         | 60s    | 5            | per user                        |
 | `POST /api/streams/:id/chat-token`          | 60s    | 10           | per IP (guests have no user id) |
+| `GET /api/videos/search` (search)           | 60s    | 60           | per IP                          |
+| `POST /api/videos/:id/view` (view tracking) | 60s    | 60           | per IP                          |
 
 ## Video upload & Transcode Pipeline
 
