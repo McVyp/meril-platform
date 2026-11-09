@@ -22,7 +22,15 @@ const viewSchema = z.object({
   duration: z.number().positive().max(MAX_SECONDS),
   occurredAt: z.iso.datetime(),
   source: z
-    .enum(["feed", "search", "recommended", "following", "ad", "direct"])
+    .enum([
+      "feed",
+      "search",
+      "recommended",
+      "following",
+      "profile",
+      "ad",
+      "direct",
+    ])
     .default("direct"),
 });
 
@@ -44,7 +52,7 @@ interactionsRouter.post(
 
     const { sessionId, events } = parsed.data;
     const country = clientCountry(req);
-    const device = parseDevice(req.headers["user-agent"])
+    const device = parseDevice(req.headers["user-agent"]);
 
     try {
       let userId: string | null = null;

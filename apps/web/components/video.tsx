@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import Hls from "hls.js";
 import { useVideoInteraction } from "@/hooks/useVideoInteraction";
+import type { VideoSource } from "@/types/video";
 
 interface VideoProps {
   videoUrl: string;
@@ -11,6 +12,7 @@ interface VideoProps {
   isLoaded: boolean;
   isLive?: boolean;
   isNextLive?: boolean;
+  source?: VideoSource;
 }
 
 export default function Video({
@@ -21,6 +23,7 @@ export default function Video({
   isLoaded,
   isLive = false,
   isNextLive = false,
+  source,
 }: VideoProps) {
   const [showSpinner, setShowSpinner] = useState(!isLoaded);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -30,7 +33,7 @@ export default function Video({
   const preloadHlsRef = useRef<Hls | null>(null);
   const preloadedUrlRef = useRef<string | null>(null);
 
-  const tracking = useVideoInteraction(videoId, isLive);
+  const tracking = useVideoInteraction(videoId, isLive, source);
 
   useEffect(() => {
     const video = videoRef.current;

@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import VideoPlayer from "@/components/video-player";
 import { recordView } from "@/lib/record-view";
+import type { VideoSource } from "@/types/video";
 
 interface WatchItem {
   id: string;
   title: string;
   playbackUrl: string | null;
   description: string;
+  source?: VideoSource;
 }
 
 const DEFAULT_ITEM: WatchItem = {
@@ -57,6 +59,7 @@ export default function WatchPage() {
                 title={item.title}
                 videoId={item.id || undefined}
                 onFirstPlay={() => item.id && recordView(item.id)}
+                source={item.source}
               />
             )}
           </div>

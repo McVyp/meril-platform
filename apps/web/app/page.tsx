@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Title from "@/components/title";
 import Video from "@/components/video";
-import { ApiVideo, VideoData } from "@/types/video";
+import type { ApiVideo, VideoData, VideoSource } from "@/types/video";
 import { useVideoCache } from "@/hooks/useVideoCache";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import "./globals.css";
@@ -30,7 +30,7 @@ export default function Home() {
 
   const displayedItems = searchResults ?? items;
 
-  const mapApiVideos = (videos: ApiVideo[]): VideoData[] =>
+  const mapApiVideos = (videos: ApiVideo[], source: VideoSource): VideoData[] =>
     videos
       .filter((v): v is ApiVideo & { playbackUrl?: string; hlsUrl?: string } =>
         Boolean(v.playbackUrl ?? v.hlsUrl),
@@ -43,6 +43,7 @@ export default function Home() {
         hlsUrl: v.hlsUrl ?? null,
         type: "video" as const,
         isAiGenerated: v.isAiGenerated ?? false,
+        source,
       }));
 
   const mapSearchResults = (videos: ApiVideo[]): VideoData[] =>
@@ -54,6 +55,7 @@ export default function Home() {
       hlsUrl: v.hlsUrl ?? null,
       type: "video" as const,
       isAiGenerated: v.isAiGenerated ?? false,
+      source: "search" as const,
     }));
 
   const fetchMoreVideos = useCallback(() => {
@@ -80,7 +82,10 @@ export default function Home() {
           hasMoreRef.current = data.nextCursor !== null;
         }
 
-        const dbVideos = mapApiVideos(data.videos);
+        const dbVideos = mapApiVideos(
+          data.videos,
+          firstPage ? "recommended" : "feed",
+        );
         if (dbVideos.length === 0) return;
 
         setItems((prev) => {
@@ -224,6 +229,7 @@ export default function Home() {
           title: item.title,
           playbackUrl: item.hlsUrl ?? item.videoUrl,
           description: item.description,
+          source: item.source,
         }),
       );
     } catch (err) {
@@ -259,6 +265,7 @@ export default function Home() {
           isLoaded={true}
           isLive={currentItem.type === "live"}
           isNextLive={nextItem?.type === "live"}
+          source={currentItem.source}
         />
       )}
 

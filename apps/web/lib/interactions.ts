@@ -1,3 +1,5 @@
+import type { VideoSource } from "@/types/video";
+
 const SESSION_KEY = "meril_sessionId";
 
 // anonymous id for the current user session, so guests get personalized feeds too.
@@ -18,6 +20,7 @@ export function sendView(
   videoId: string,
   watchedDuration: number,
   duration: number,
+  source: VideoSource = "direct",
 ) {
   if (!Number.isFinite(duration) || duration <= 0 || watchedDuration <= 0)
     return;
@@ -31,6 +34,7 @@ export function sendView(
         watchedDuration,
         duration,
         occurredAt: new Date().toISOString(),
+        source,
       },
     ],
   });

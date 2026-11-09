@@ -158,6 +158,7 @@ export default function CreatorProfilePage() {
                       src={video.hlsUrl}
                       title={video.title}
                       videoId={video.id}
+                      source="profile"
                       onFirstPlay={() => recordView(video.id)}
                     />
                   ) : video.thumbnailUrl ? (

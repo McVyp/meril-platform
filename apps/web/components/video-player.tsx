@@ -3,6 +3,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useVideoInteraction } from "@/hooks/useVideoInteraction";
 import Hls from "hls.js";
 import { Badge } from "./ui/badge";
+import type { VideoSource } from "@/types/video";
 
 interface VideoPlayerProps {
   src: string;
@@ -11,6 +12,7 @@ interface VideoPlayerProps {
   isLive?: boolean;
   showLiveBadge?: boolean;
   onFirstPlay?: () => void;
+  source?: VideoSource;
 }
 
 function SpeakerOnIcon() {
@@ -61,6 +63,7 @@ export default function VideoPlayer({
   isLive = false,
   showLiveBadge = true,
   onFirstPlay,
+  source,
 }: VideoPlayerProps) {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -78,7 +81,7 @@ export default function VideoPlayer({
   >([]);
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
 
-  const tracking = useVideoInteraction(videoId, isLive);
+  const tracking = useVideoInteraction(videoId, isLive, source);
 
   // HLS setup
   useEffect(() => {

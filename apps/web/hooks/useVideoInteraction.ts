@@ -1,9 +1,11 @@
 import { sendView } from "@/lib/interactions";
+import type { VideoSource } from "@/types/video";
 import { useCallback, useEffect, useRef } from "react";
 
 export function useVideoInteraction(
   videoId: string | undefined,
   isLive: boolean,
+  source: VideoSource = "direct",
 ) {
   const watchedRef = useRef(0);
   const durationRef = useRef(0);
@@ -12,10 +14,10 @@ export function useVideoInteraction(
   const flushView = useCallback(() => {
     if (!videoId || isLive) return;
 
-    sendView(videoId, watchedRef.current, durationRef.current);
+    sendView(videoId, watchedRef.current, durationRef.current, source);
     watchedRef.current = 0;
     lastTimeRef.current = null;
-  }, [videoId, isLive]);
+  }, [videoId, isLive, source]);
 
   useEffect(() => () => flushView(), [flushView]);
 

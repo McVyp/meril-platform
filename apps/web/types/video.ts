@@ -1,3 +1,6 @@
+export type VideoSource =
+  "feed" | "search" | "recommended" | "following" | "profile" | "ad" | "direct";
+
 export interface VideoData {
   id: string;
   title: string;
@@ -6,6 +9,7 @@ export interface VideoData {
   hlsUrl: string | null;
   type: "video" | "live";
   isAiGenerated: boolean;
+  source?: VideoSource;
 }
 
 export interface ApiVideo {
