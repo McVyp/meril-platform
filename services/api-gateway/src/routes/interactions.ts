@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { clientCountry } from "../lib/clientIp";
+import { parseDevice } from "../lib/device";
 import { z } from "zod";
 import { rateLimit } from "../middleware/rateLimit";
 import { optionalAuth } from "../middleware/auth";
@@ -20,6 +21,9 @@ const viewSchema = z.object({
   watchedDuration: z.number().min(0).max(MAX_SECONDS),
   duration: z.number().positive().max(MAX_SECONDS),
   occurredAt: z.iso.datetime(),
+  source: z
+    .enum(["feed", "search", "recommended", "following", "ad", "direct"])
+    .default("direct"),
 });
 
 const bodySchema = z.object({
@@ -40,6 +44,7 @@ interactionsRouter.post(
 
     const { sessionId, events } = parsed.data;
     const country = clientCountry(req);
+    const device = parseDevice(req.headers["user-agent"])
 
     try {
       let userId: string | null = null;
@@ -64,6 +69,8 @@ interactionsRouter.post(
             duration: e.duration,
             occurredAt: e.occurredAt,
             country,
+            ...device,
+            source: e.source,
           },
           e.videoId,
         );

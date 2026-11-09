@@ -11,7 +11,13 @@ interface VideoInteractionEvent {
   duration: number;
   occurredAt: string;
   country?: string | null;
+  deviceType?: string | null;
+  os?: string | null;
+  browser?: string | null;
+  source?: string | null;
 }
+
+const shortText = (value: unknown) => typeof value === "string" && value.length > 0 && value.length <= 40 ? value : null;
 
 export async function handleVideoInteraction(raw: string) {
   let event: VideoInteractionEvent;
@@ -30,6 +36,10 @@ export async function handleVideoInteraction(raw: string) {
     duration,
     occurredAt,
     country,
+    deviceType,
+    os,
+    browser,
+    source,
   } = event;
 
   if (!eventId || !videoId || (!userId && !sessionId)) {
@@ -66,6 +76,10 @@ export async function handleVideoInteraction(raw: string) {
         duration: Math.round(duration),
         occurredAt: at,
         country: safeCountry,
+        deviceType: shortText(deviceType),
+        os: shortText(os),
+        browser: shortText(browser),
+        source: shortText(source),
       },
     });
   } catch (err: any) {
