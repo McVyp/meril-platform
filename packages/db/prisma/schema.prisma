@@ -74,6 +74,11 @@ model Interaction {
   sessionId       String?
   videoId         String
   country         String?
+  city            String?
+  deviceType      String?
+  os              String?
+  browser         String?
+  source          String?
   watchedDuration Int
   duration        Int
   occurredAt       DateTime
@@ -82,6 +87,7 @@ model Interaction {
   @@index([userId, occurredAt])
   @@index([sessionId, occurredAt])
   @@index([videoId, occurredAt])
+  @@index([occurredAt])
 }
 
 model Stream {
