@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { headers as requestHeaders } from "next/headers";
 import { getSessionTokens } from "@/lib/auth/session";
 
 const API_URL = process.env.API_URL;
@@ -47,6 +48,8 @@ export async function proxyToGateway(path: string, opts: ProxyOptions = {}) {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers["Content-Type"] = "application/json";
+  const userAgent = (await requestHeaders()).get("user-agent");
+  if (userAgent) headers["user-Agent"] = userAgent;
 
   const proxySecret = process.env.GATEWAY_PROXY_SECRET;
   if (clientKey && proxySecret) {
