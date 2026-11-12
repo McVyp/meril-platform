@@ -12,11 +12,11 @@
     "db:studio": "pnpm --filter @meril/db studio"
   },
   "dependencies": {
-    "@aws-sdk/client-ivs": "^3.1160.0",
-    "@aws-sdk/client-ivs-realtime": "^3.1160.0",
-    "@aws-sdk/client-ivschat": "^3.1160.0",
-    "@aws-sdk/client-s3": "^3.1160.0",
-    "@aws-sdk/s3-request-presigner": "^3.1160.0",
+    "@aws-sdk/client-ivs": "^3.1162.0",
+    "@aws-sdk/client-ivs-realtime": "^3.1162.0",
+    "@aws-sdk/client-ivschat": "^3.1162.0",
+    "@aws-sdk/client-s3": "^3.1162.0",
+    "@aws-sdk/s3-request-presigner": "^3.1162.0",
     "@bufbuild/protobuf": "^2.16.0",
     "@connectrpc/connect": "^2.3.0",
     "@connectrpc/connect-node": "^2.3.0",
@@ -29,10 +29,10 @@
     "express": "^5.3.0",
     "helmet": "^8.3.0",
     "ioredis": "^6.0.0",
-    "jose": "^6.2.14",
+    "jose": "^6.2.15",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.1",
-    "ws": "^8.22.0",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
