@@ -158,6 +158,18 @@ sequenceDiagram
     MP-->>T: activity result
 ```
 
+## Recommendations
+
+The Go recommender (gRPC) builds a taste vector for each user from their likes and skips, then returns the nearest videos from pgvector. Videos the user has already watched, their own videos, and videos that aren't ready are left out.
+
+```mermaid
+flowchart LR
+  App[api-gateway] -->|gRPC| Rec[Recommender]
+  Rec --> Taste[Taste vector<br/>toward likes, away from skips]
+  Taste --> NN[Nearest videos<br/>pgvector]
+  NN --> Out[Recommended videos]
+```
+
 ## Local development
 
 1. Start infrastructure:
