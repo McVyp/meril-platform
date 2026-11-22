@@ -28,8 +28,7 @@ Meril is a live streaming platform supporting both desktop (RTMP) and mobile (WH
 
 <img width="1942" height="1601" alt="meril" src="https://github.com/user-attachments/assets/981c6985-18ec-4599-a60d-daf8153acfae" />
 
-
-Clients connect to Meril app, which branches into three service areas - Auth (Cognito-backed token verification), Live Stream (desktop RTMP /mobile WHIP into AWS IVS, with IVS Chat), and Video Upload (presigned S3 upload feeding a Temporal transcode workflow). EventBridge routes IVS state-change events back into the app, with Redis handling both rate limiting and webhook dedup, and a full SQS DLQ -> CloudWatch -> SNS alerting chain for failed webhook deliveries. Video views and transcode-completion events flow through Kafka into a shared event-consumer, writing to the same Postgres database used by the rest of the app. Playback (both live and VOD) is served back to clients via CloudFront.
+Clients connect to Meril app, which branches into three service areas - Auth (Cognito-backed token verification), Live Stream (desktop RTMP /mobile WHIP into AWS IVS, with IVS Chat), and Video Upload (presigned S3 upload feeding a Temporal transcode workflow). The app also calls the Embedder for search and the Go Recommender (gRPC) for recommendations. EventBridge routes IVS state-change events back into the app, which deduplicates them in Postgres (ProcessedEvent table), with Redis handling rate limiting, and a full SQS DLQ -> CloudWatch -> SNS alerting chain for failed webhook deliveries. Video views and transcode-completion events flow through Kafka into the ingestion service (event-consumer), writing to the same Postgres database used by the rest of the app. Playback (both live and VOD) is served back to clients via CloudFront.
 
 ## Mobile go-live pipeline
 
