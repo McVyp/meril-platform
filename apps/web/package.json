@@ -40,7 +40,7 @@
     "eslint-config-next": "^16.4.5",
     "shadcn": "^4.23.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^7"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
