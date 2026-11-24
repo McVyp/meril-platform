@@ -1,3 +1,4 @@
+
 # Meril
 
 Meril is a live streaming platform supporting both desktop (RTMP) and mobile (WHIP) broadcasting.
@@ -25,9 +26,9 @@ Meril is a live streaming platform supporting both desktop (RTMP) and mobile (WH
 
 ## High-level System Design
 
-<img width="972" height="681" alt="meril-90 drawio" src="https://github.com/user-attachments/assets/36ae1a33-87b3-4104-8d76-1f353b6b4562" />
+<img width="1942" height="1601" alt="meril" src="https://github.com/user-attachments/assets/981c6985-18ec-4599-a60d-daf8153acfae" />
 
-Clients connect to Meril app, which branches into three service areas - Auth (Cognito-backed token verification), Live Stream (desktop RTMP /mobile WHIP into AWS IVS, with IVS Chat), and Video Upload (presigned S3 upload feeding a Temporal transcode workflow). EventBridge routes IVS state-change events back into the app, with Redis handling both rate limiting and webhook dedup, and a full SQS DLQ -> CloudWatch -> SNS alerting chain for failed webhook deliveries. Video views and transcode-completion events flow through Kafka into a shared event-consumer, writing to the same Postgres database used by the rest of the app. Playback (both live and VOD) is served back to clients via CloudFront.
+Clients connect to Meril app, which branches into three service areas - Auth (Cognito-backed token verification), Live Stream (desktop RTMP /mobile WHIP into AWS IVS, with IVS Chat), and Video Upload (presigned S3 upload feeding a Temporal transcode workflow). The app also calls the Embedder for search and the Go Recommender (gRPC) for recommendations. EventBridge routes IVS state-change events back into the app, which deduplicates them in Postgres (ProcessedEvent table), with Redis handling rate limiting, and a full SQS DLQ -> CloudWatch -> SNS alerting chain for failed webhook deliveries. Video views and transcode-completion events flow through Kafka into the ingestion service (event-consumer), writing to the same Postgres database used by the rest of the app. Playback (both live and VOD) is served back to clients via CloudFront.
 
 ## Mobile go-live pipeline
 
@@ -155,6 +156,18 @@ sequenceDiagram
     MP->>S3: read raw file, transcode
     MP->>S3: write HLS output
     MP-->>T: activity result
+```
+
+## Recommendations
+
+The Go recommender (gRPC) builds a taste vector for each user from their likes and skips, then returns the nearest videos from pgvector. Videos the user has already watched, their own videos, and videos that aren't ready are left out.
+
+```mermaid
+flowchart LR
+  App[api-gateway] -->|gRPC| Rec[Recommender]
+  Rec --> Taste[Taste vector<br/>toward likes, away from skips]
+  Taste --> NN[Nearest videos<br/>pgvector]
+  NN --> Out[Recommended videos]
 ```
 
 ## Local development
