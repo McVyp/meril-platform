@@ -39,6 +39,9 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor"]
 
   - package-ecosystem: github-actions
     directory: "/"
