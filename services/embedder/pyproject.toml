@@ -5,15 +5,15 @@ description = "Embeds search queries"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi>=0.162.5",
+    "fastapi>=0.165.0",
     "fastembed>=0.9.1",
-    "numpy>=2.5.4",
+    "numpy>=2.5.5",
     "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.16.0",
+    "httpx2>=2.16.2",
     "pytest>=9.2.0",
 ]
 
